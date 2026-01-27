@@ -428,6 +428,17 @@ You require async-managed subprocess lifecycle.
   * run HTTP checkout/return flows
   * call `lmstat` wrapper as subprocess and assert text output contains expected lines
   * verify log file contains template-compliant events
+* Functional behavior tests (mandatory):
+
+  * checkout grants when capacity available
+  * checkout denies for unknown feature
+  * checkout denies when feature expired
+  * queue when capacity exhausted
+  * dequeue grant when a seat is returned
+  * return (checkin) updates usage counters
+  * denied return for unknown checkout
+  * idempotent responses for repeated request_id
+  * bookkeeping invariants: `in_use` never exceeds `total`, queued count matches queue size
 
 ### 11.2 Subprocess Management Requirements
 

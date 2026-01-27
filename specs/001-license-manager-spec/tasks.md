@@ -49,6 +49,10 @@ description: "Task list for License Manager Specification"
 - [X] T022 Add bash wrappers in `simulators/wrappers/lmgrd` and `simulators/wrappers/lmstat`
 - [X] T023 Add subprocess integration tests in `simulators/tests/test_sim_integration.py`
 - [X] T024 [P] Add log template compliance tests in `simulators/tests/test_log_template.py`
+- [X] T025 [P] Add checkout/return behavior tests in `simulators/tests/test_checkout_flow.py`
+- [X] T026 [P] Add queue/dequeue behavior tests in `simulators/tests/test_queue_semantics.py`
+- [X] T027 [P] Add denial/idempotency tests in `simulators/tests/test_denials_idempotency.py`
+- [X] T028 [P] Add bookkeeping invariant tests in `simulators/tests/test_bookkeeping.py`
 
 **Checkpoint**: Simulator test suite passes before any client or server work begins
 
@@ -62,18 +66,18 @@ description: "Task list for License Manager Specification"
 
 ### Tests for User Story 1
 
-- [ ] T025 [P] [US1] Contract test for endpoints list in `tests/contract/test_endpoints_api.py`
-- [ ] T026 [P] [US1] Integration test for fleet visibility in `tests/integration/test_fleet_visibility.py`
+- [ ] T029 [P] [US1] Contract test for endpoints list in `tests/contract/test_endpoints_api.py`
+- [ ] T030 [P] [US1] Integration test for fleet visibility in `tests/integration/test_fleet_visibility.py`
 
 ### Implementation for User Story 1
 
-- [ ] T027 [P] [US1] Create endpoint model in `server/src/core/models/endpoint.py`
-- [ ] T028 [P] [US1] Create license feature model in `server/src/core/models/license_feature.py`
-- [ ] T029 [P] [US1] Create usage sample model in `server/src/core/models/usage_sample.py`
-- [ ] T030 [US1] Implement fleet service in `server/src/core/services/fleet_service.py`
-- [ ] T031 [US1] Implement endpoints API routes in `server/src/api/routes/endpoints.py`
-- [ ] T032 [US1] Implement fleet GUI view in `server/src/gui/pages/fleet.py`
-- [ ] T033 [US1] Add fleet GUI template in `server/src/gui/templates/fleet.html`
+- [ ] T031 [P] [US1] Create endpoint model in `server/src/core/models/endpoint.py`
+- [ ] T032 [P] [US1] Create license feature model in `server/src/core/models/license_feature.py`
+- [ ] T033 [P] [US1] Create usage sample model in `server/src/core/models/usage_sample.py`
+- [ ] T034 [US1] Implement fleet service in `server/src/core/services/fleet_service.py`
+- [ ] T035 [US1] Implement endpoints API routes in `server/src/api/routes/endpoints.py`
+- [ ] T036 [US1] Implement fleet GUI view in `server/src/gui/pages/fleet.py`
+- [ ] T037 [US1] Add fleet GUI template in `server/src/gui/templates/fleet.html`
 
 **Checkpoint**: User Story 1 is fully functional and independently testable
 
@@ -87,18 +91,18 @@ description: "Task list for License Manager Specification"
 
 ### Tests for User Story 2
 
-- [ ] T034 [P] [US2] Contract test for action requests in `tests/contract/test_actions_api.py`
-- [ ] T035 [P] [US2] Integration test for audit trail in `tests/integration/test_audit_trail.py`
+- [ ] T038 [P] [US2] Contract test for action requests in `tests/contract/test_actions_api.py`
+- [ ] T039 [P] [US2] Integration test for audit trail in `tests/integration/test_audit_trail.py`
 
 ### Implementation for User Story 2
 
-- [ ] T036 [P] [US2] Create operation request model in `server/src/core/models/operation_request.py`
-- [ ] T037 [P] [US2] Create audit event model in `server/src/core/models/audit_event.py`
-- [ ] T038 [US2] Implement operations service in `server/src/core/services/operations_service.py`
-- [ ] T039 [US2] Implement audit service in `server/src/core/services/audit_service.py`
-- [ ] T040 [US2] Implement actions API routes in `server/src/api/routes/actions.py`
-- [ ] T041 [US2] Implement audits API routes in `server/src/api/routes/audits.py`
-- [ ] T042 [US2] Implement agent action executor in `client/src/agent/actions.py`
+- [ ] T040 [P] [US2] Create operation request model in `server/src/core/models/operation_request.py`
+- [ ] T041 [P] [US2] Create audit event model in `server/src/core/models/audit_event.py`
+- [ ] T042 [US2] Implement operations service in `server/src/core/services/operations_service.py`
+- [ ] T043 [US2] Implement audit service in `server/src/core/services/audit_service.py`
+- [ ] T044 [US2] Implement actions API routes in `server/src/api/routes/actions.py`
+- [ ] T045 [US2] Implement audits API routes in `server/src/api/routes/audits.py`
+- [ ] T046 [US2] Implement agent action executor in `client/src/agent/actions.py`
 
 **Checkpoint**: User Story 2 is fully functional and independently testable
 
@@ -112,15 +116,15 @@ description: "Task list for License Manager Specification"
 
 ### Tests for User Story 3
 
-- [ ] T043 [P] [US3] Unit test for local journal in `client/tests/test_offline_journal.py`
-- [ ] T044 [P] [US3] Integration test for offline sync in `tests/integration/test_offline_sync.py`
+- [ ] T047 [P] [US3] Unit test for local journal in `client/tests/test_offline_journal.py`
+- [ ] T048 [P] [US3] Integration test for offline sync in `tests/integration/test_offline_sync.py`
 
 ### Implementation for User Story 3
 
-- [ ] T045 [US3] Implement local journal store in `client/src/agent/journal.py`
-- [ ] T046 [US3] Implement sync handler in `client/src/agent/sync.py`
-- [ ] T047 [US3] Implement offline status UI in `client/src/gui/offline_status.py`
-- [ ] T048 [US3] Implement server sync API route in `server/src/api/routes/sync.py`
+- [ ] T049 [US3] Implement local journal store in `client/src/agent/journal.py`
+- [ ] T050 [US3] Implement sync handler in `client/src/agent/sync.py`
+- [ ] T051 [US3] Implement offline status UI in `client/src/gui/offline_status.py`
+- [ ] T052 [US3] Implement server sync API route in `server/src/api/routes/sync.py`
 
 **Checkpoint**: User Story 3 is fully functional and independently testable
 
@@ -134,8 +138,8 @@ description: "Task list for License Manager Specification"
 
 ### Implementation for User Story 4
 
-- [ ] T049 [US4] Define phase gate criteria in `specs/001-license-manager-spec/phase-gates.md`
-- [ ] T050 [US4] Add gate verification checklist in `tests/phase_gates/README.md`
+- [ ] T053 [US4] Define phase gate criteria in `specs/001-license-manager-spec/phase-gates.md`
+- [ ] T054 [US4] Add gate verification checklist in `tests/phase_gates/README.md`
 
 **Checkpoint**: Phase gate documentation is complete
 
@@ -145,13 +149,13 @@ description: "Task list for License Manager Specification"
 
 **Purpose**: Improvements that affect multiple user stories
 
-- [ ] T051 [P] Implement usage export service in `server/src/core/services/export_service.py`
-- [ ] T052 [P] Implement export API routes in `server/src/api/routes/exports.py`
-- [ ] T053 [P] Contract test for export endpoints in `tests/contract/test_exports_api.py`
-- [ ] T054 Implement server data persistence in `server/src/core/services/storage_service.py`
-- [ ] T055 Implement database migrations in `server/src/migrations/versions/0001_init.py`
-- [ ] T056 [P] Add retention policy task notes in `server/src/core/services/retention_policy.py`
-- [ ] T057 Run quickstart validation checklist in `specs/001-license-manager-spec/quickstart.md`
+- [ ] T055 [P] Implement usage export service in `server/src/core/services/export_service.py`
+- [ ] T056 [P] Implement export API routes in `server/src/api/routes/exports.py`
+- [ ] T057 [P] Contract test for export endpoints in `tests/contract/test_exports_api.py`
+- [ ] T058 Implement server data persistence in `server/src/core/services/storage_service.py`
+- [ ] T059 Implement database migrations in `server/src/migrations/versions/0001_init.py`
+- [ ] T060 [P] Add retention policy task notes in `server/src/core/services/retention_policy.py`
+- [ ] T061 Run quickstart validation checklist in `specs/001-license-manager-spec/quickstart.md`
 
 ---
 
