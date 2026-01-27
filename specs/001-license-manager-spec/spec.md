@@ -14,6 +14,7 @@
 - Q: What is the expected scale of managed endpoints? → A: Up to 100 endpoints.
 - Q: What availability target is required? → A: Best-effort, no SLA.
 - Q: What data export format is required for reporting? → A: JSON export.
+- Q: Is authentication in scope? → A: Authentication is out of scope; assume an authenticated identity is provided.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -101,7 +102,7 @@ As a project sponsor, I want development to proceed simulator → client → ser
 - **FR-010**: System MUST provide a single-writer editing mechanism for configuration proposals.
 - **FR-011**: The delivery plan MUST follow the sequence simulator → client → server → database → GUIs.
 - **FR-012**: Each phase MUST define a test suite with pass/fail criteria that gate entry to the next phase.
-- **FR-013**: Any authenticated user MUST be allowed to perform supported operational actions.
+- **FR-013**: Any pre-authenticated user identity provided by the environment MUST be allowed to perform supported operational actions.
 - **FR-014**: The system MUST retain usage samples and audit records for 24 months.
 - **FR-015**: The system MUST support up to 100 managed endpoints.
 - **FR-016**: The system MUST operate on a best-effort basis with no formal availability SLA.
@@ -113,6 +114,7 @@ As a project sponsor, I want development to proceed simulator → client → ser
 - Operators require both central visibility and local operational control in restricted networks.
 - A standard set of operational actions is agreed upon by stakeholders for all managed endpoints.
 - Each component can be validated with a meaningful test suite before the next component begins.
+- Authentication and identity provisioning are out of scope; the system receives an authenticated identity from its environment.
 
 ### Key Entities *(include if feature involves data)*
 

@@ -22,7 +22,7 @@ Deliver a phased, test-gated license management system starting with determinist
 **Storage**: TimescaleDB (PostgreSQL) for server data; SQLite for client journal  
 **Testing**: pytest  
 **Target Platform**: Linux server (RHEL7 target) with desktop client GUI  
-**Project Type**: Web application (backend + frontend) with desktop client  
+**Project Type**: Server + client + simulators (GUI included under server and client)  
 **Performance Goals**: Fleet view available within 30 seconds for 95% of attempts; operational actions return outcome within 2 minutes  
 **Constraints**: Offline-capable clients; best-effort availability (no SLA); 24-month retention for usage and audit records  
 **Scale/Scope**: Up to 100 managed endpoints
