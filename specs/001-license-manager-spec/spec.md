@@ -5,6 +5,16 @@
 **Status**: Draft  
 **Input**: User description: "License manager technical specification covering background, architecture, components, configuration, operations, offline behavior, data storage, testing, portability, and security."
 
+## Clarifications
+
+### Session 2026-01-27
+
+- Q: Who can perform operational actions? → A: Any authenticated user can perform actions.
+- Q: What is the retention horizon for usage samples and audit records? → A: 24 months.
+- Q: What is the expected scale of managed endpoints? → A: Up to 100 endpoints.
+- Q: What availability target is required? → A: Best-effort, no SLA.
+- Q: What data export format is required for reporting? → A: JSON export.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Fleet Visibility (Priority: P1)
@@ -91,6 +101,11 @@ As a project sponsor, I want development to proceed simulator → client → ser
 - **FR-010**: System MUST provide a single-writer editing mechanism for configuration proposals.
 - **FR-011**: The delivery plan MUST follow the sequence simulator → client → server → database → GUIs.
 - **FR-012**: Each phase MUST define a test suite with pass/fail criteria that gate entry to the next phase.
+- **FR-013**: Any authenticated user MUST be allowed to perform supported operational actions.
+- **FR-014**: The system MUST retain usage samples and audit records for 24 months.
+- **FR-015**: The system MUST support up to 100 managed endpoints.
+- **FR-016**: The system MUST operate on a best-effort basis with no formal availability SLA.
+- **FR-017**: The system MUST provide JSON export for reporting data.
 
 ### Assumptions
 

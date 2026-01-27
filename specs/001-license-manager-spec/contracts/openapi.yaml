@@ -1,0 +1,227 @@
+openapi: 3.0.3
+info:
+  title: License Manager API
+  version: 1.0.0
+servers:
+  - url: /api
+paths:
+  /endpoints:
+    get:
+      summary: List managed endpoints
+      responses:
+        "200":
+          description: Endpoint list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Endpoint"
+  /endpoints/{endpointId}:
+    get:
+      summary: Get a managed endpoint
+      parameters:
+        - in: path
+          name: endpointId
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Endpoint detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EndpointDetail"
+  /endpoints/{endpointId}/actions:
+    post:
+      summary: Request an operational action
+      parameters:
+        - in: path
+          name: endpointId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ActionRequest"
+      responses:
+        "202":
+          description: Action accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ActionResult"
+  /audits:
+    get:
+      summary: List audit events
+      responses:
+        "200":
+          description: Audit events
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AuditEvent"
+  /exports/usage:
+    post:
+      summary: Export usage data as JSON
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExportRequest"
+      responses:
+        "200":
+          description: Export payload
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UsageExport"
+  /exports/audit:
+    post:
+      summary: Export audit data as JSON
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExportRequest"
+      responses:
+        "200":
+          description: Export payload
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuditExport"
+components:
+  schemas:
+    Endpoint:
+      type: object
+      properties:
+        id:
+          type: string
+        host:
+          type: string
+        port:
+          type: integer
+        status:
+          type: string
+          enum: [healthy, degraded, stale, unknown]
+        lastReportedAt:
+          type: string
+          format: date-time
+      required: [id, host, port, status]
+    EndpointDetail:
+      allOf:
+        - $ref: "#/components/schemas/Endpoint"
+        - type: object
+          properties:
+            features:
+              type: array
+              items:
+                $ref: "#/components/schemas/LicenseFeature"
+            latestSample:
+              $ref: "#/components/schemas/UsageSample"
+    LicenseFeature:
+      type: object
+      properties:
+        name:
+          type: string
+        totalCount:
+          type: integer
+        inUseCount:
+          type: integer
+        expiryDate:
+          type: string
+          format: date
+      required: [name, totalCount, inUseCount]
+    UsageSample:
+      type: object
+      properties:
+        capturedAt:
+          type: string
+          format: date-time
+        features:
+          type: array
+          items:
+            $ref: "#/components/schemas/LicenseFeature"
+      required: [capturedAt, features]
+    ActionRequest:
+      type: object
+      properties:
+        actionType:
+          type: string
+          enum: [start, stop, restart, reread, apply_change, diagnostics]
+        requestedBy:
+          type: string
+      required: [actionType, requestedBy]
+    ActionResult:
+      type: object
+      properties:
+        requestId:
+          type: string
+        status:
+          type: string
+          enum: [requested, in_progress, succeeded, failed]
+        message:
+          type: string
+      required: [requestId, status]
+    AuditEvent:
+      type: object
+      properties:
+        id:
+          type: string
+        actorId:
+          type: string
+        action:
+          type: string
+        occurredAt:
+          type: string
+          format: date-time
+        endpointId:
+          type: string
+        outcome:
+          type: string
+      required: [id, actorId, action, occurredAt, endpointId]
+    ExportRequest:
+      type: object
+      properties:
+        startTime:
+          type: string
+          format: date-time
+        endTime:
+          type: string
+          format: date-time
+        endpointIds:
+          type: array
+          items:
+            type: string
+      required: [startTime, endTime]
+    UsageExport:
+      type: object
+      properties:
+        generatedAt:
+          type: string
+          format: date-time
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/UsageSample"
+      required: [generatedAt, items]
+    AuditExport:
+      type: object
+      properties:
+        generatedAt:
+          type: string
+          format: date-time
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/AuditEvent"
+      required: [generatedAt, items]
