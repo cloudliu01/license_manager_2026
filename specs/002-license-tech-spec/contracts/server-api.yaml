@@ -1,0 +1,196 @@
+openapi: 3.0.3
+info:
+  title: License Manager Server API
+  version: 1.0.0
+paths:
+  /v1/agents/{agent_id}:
+    get:
+      summary: Get agent status and latest snapshot metadata
+      parameters:
+        - name: agent_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Agent status
+  /v1/agents/{agent_id}/sync:
+    post:
+      summary: Upload snapshot and journal events on reconnect
+      parameters:
+        - name: agent_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AgentSyncRequest"
+      responses:
+        "200":
+          description: Sync acknowledged
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgentSyncAck"
+  /v1/control-requests:
+    post:
+      summary: Create a control request from Server GUI
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ControlRequest"
+      responses:
+        "201":
+          description: Control request created
+  /v1/control-requests/{request_id}:
+    get:
+      summary: Get control request result
+      parameters:
+        - name: request_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Control request status
+  /v1/edit-leases:
+    post:
+      summary: Create an edit lease for a client
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EditLeaseRequest"
+      responses:
+        "201":
+          description: Lease created
+  /v1/config-changes:
+    post:
+      summary: Propose a server-initiated config change
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConfigChangeRequest"
+      responses:
+        "202":
+          description: Change proposal accepted
+  /v1/agents/{agent_id}/commands/pull:
+    post:
+      summary: Agent pulls pending commands
+      parameters:
+        - name: agent_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Pending commands
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CommandBatch"
+  /v1/audit:
+    get:
+      summary: Query audit records
+      responses:
+        "200":
+          description: Audit records
+components:
+  schemas:
+    AgentSyncRequest:
+      type: object
+      required: [protocol_version, snapshot, journal_events]
+      properties:
+        protocol_version:
+          type: string
+        snapshot:
+          $ref: "#/components/schemas/ConfigSnapshot"
+        journal_events:
+          type: array
+          items:
+            $ref: "#/components/schemas/JournalEvent"
+    AgentSyncAck:
+      type: object
+      required: [last_event_id]
+      properties:
+        last_event_id:
+          type: string
+    ControlRequest:
+      type: object
+      required: [request_id, agent_id, action_type, initiated_by]
+      properties:
+        request_id:
+          type: string
+        agent_id:
+          type: string
+        action_type:
+          type: string
+        initiated_by:
+          type: string
+    EditLeaseRequest:
+      type: object
+      required: [agent_id]
+      properties:
+        agent_id:
+          type: string
+    ConfigChangeRequest:
+      type: object
+      required: [change_id, agent_id, lease_id, base_config_rev, change_set]
+      properties:
+        change_id:
+          type: string
+        agent_id:
+          type: string
+        lease_id:
+          type: string
+        base_config_rev:
+          type: integer
+        change_set:
+          type: object
+    CommandBatch:
+      type: object
+      properties:
+        control_requests:
+          type: array
+          items:
+            $ref: "#/components/schemas/ControlRequest"
+        config_changes:
+          type: array
+          items:
+            $ref: "#/components/schemas/ConfigChangeRequest"
+    ConfigSnapshot:
+      type: object
+      required: [config_rev, config_hash, payload, reported_at]
+      properties:
+        config_rev:
+          type: integer
+        config_hash:
+          type: string
+        payload:
+          type: object
+        reported_at:
+          type: string
+          format: date-time
+    JournalEvent:
+      type: object
+      required: [event_id, event_time, action_type]
+      properties:
+        event_id:
+          type: string
+        event_time:
+          type: string
+          format: date-time
+        action_type:
+          type: string

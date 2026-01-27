@@ -1,0 +1,100 @@
+openapi: 3.0.3
+info:
+  title: License Manager Server API
+  version: 1.0.0
+  description: API for fleet management and observability.
+
+paths:
+  /agents:
+    get:
+      summary: List all agents
+      responses:
+        '200':
+          description: List of agents
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Agent'
+
+  /agents/{agent_id}/control:
+    post:
+      summary: Send a control command to an agent
+      parameters:
+        - name: agent_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ControlAction'
+      responses:
+        '202':
+          description: Command accepted and queued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ControlRequestResult'
+
+  /agents/{agent_id}/lease:
+    post:
+      summary: Acquire an edit lease
+      responses:
+        '201':
+          description: Lease acquired
+        '409':
+          description: Lease already held by another user
+
+  /agents/{agent_id}/config:
+    post:
+      summary: Submit a new configuration (requires lease)
+      parameters:
+        - name: agent_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConfigUpdate'
+      responses:
+        '200':
+          description: Configuration update submitted
+
+components:
+  schemas:
+    Agent:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        hostname: { type: string }
+        status: { type: string, enum: [ONLINE, STALE, OFFLINE] }
+        config_rev: { type: integer }
+
+    ControlAction:
+      type: object
+      required: [type]
+      properties:
+        type: { type: string, enum: [START, STOP, RESTART, REREAD] }
+
+    ControlRequestResult:
+      type: object
+      properties:
+        request_id: { type: string, format: uuid }
+        status: { type: string }
+
+    ConfigUpdate:
+      type: object
+      required: [lease_id, base_rev, payload]
+      properties:
+        lease_id: { type: string, format: uuid }
+        base_rev: { type: integer }
+        payload: { type: object }
