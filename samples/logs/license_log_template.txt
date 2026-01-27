@@ -29,7 +29,7 @@
 16:24:11 (lmgrd) Copyright (c) 1988-2023 Flexera. All Rights Reserved.
 16:24:11 (lmgrd) World Wide Web: http://www.flexerasoftware.com
 16:24:11 (lmgrd) License file(s): ./license.dat
-16:24:11 (lmgrd) lmd_tcp-port 5280
+16:24:11 (lmgrd) lmd_tcp-port 9876
 16:24:11 (lmgrd) (@lmgrd-SLOG@) ================================================
 16:24:11 (lmgrd) (@lmgrd-SLOG@) == LMGRD ===
 16:24:11 (lmgrd) (@lmgrd-SLOG@) Start-Date: Tue Jan 20 2026 16:24:11 PST
@@ -37,7 +37,7 @@
 16:24:11 (lmgrd) (@lmgrd-SLOG@) LMGRD Version: v11.19.5.1 build 293554 x64-linux (build 293554 (ipv6))
 16:24:11 (lmgrd) (@lmgrd-SLOG@) 
 16:24:11 (lmgrd) (@lmgrd-SLOG@) == Network Info ===
-16:24:11 (lmgrd) (@lmgrd-SLOG@) Listening port 5280
+16:24:11 (lmgrd) (@lmgrd-SLOG@) Listening port 9876
 16:24:11 (lmgrd) (@lmgrd-SLOG@) 
 16:24:11 (lmgrd) (@lmgrd-SLOG@) == Startup Info ===
 16:24:11 (lmgrd) (@lmgrd-SLOG@) Server Configuration: 3-Server Certificate
@@ -188,41 +188,45 @@
 16:25:03 (daemon_c) OUT: "V_A_3" fy@j_host2 [A M-core (Max. 4 cores)] (2 licenses)
 16:25:16 (lmgrd) Attempting connection to tertiary redundant server 10.10.10.102
 16:25:16 (lmgrd) Failed to connect to tertiary redundant server 10.10.10.102
-
-226 16:27:48 (daemon_c) OUT: "X_A_1" kk@h_host2 [X A Engine]
-227 16:27:51 (daemon_c) OUT: "111" fy@h_host2
-228 16:27:51 (daemon_c) OUT: "V_A_3" fy@h_host2
-229 16:28:03 (daemon_c) OUT: "X_A_1" wyw@t_host6 [X A Engine]
-230 16:28:07 (daemon_c) OUT: "Integrated_Metrics_Center" wyw@h_host3.abc.com [ABC3456789012]
-231 16:28:09 (daemon_c) IN: "X_A_1" es@h_host3.abc.com [X A Engine]
-232 16:28:09 (daemon_c) IN: "X_A_1" es@h_host3.abc.com [X A Engine]
-233 16:28:09 (lmgrd) Attempting connection to tertiary redundant server 10.10.10.102
-234 16:28:09 (lmgrd) Failed to connect to tertiary redundant server 10.10.10.102
-235 16:28:09 (lmgrd) Connection attempt to tertiary redundant server 10.10.10.102 failed
-236 16:28:13 (daemon_c) OUT: "Virtuoso_Multi_mode_Simulation" ra@e_host9.abc.com [AP Base] (2 licenses)
-237 16:28:16 (daemon_c) OUT: "X_A_1" gitlab-runner@h_host3.abc.com [X A Engine]
-238 16:28:16 (daemon_c) OUT: "X_B_2" gitlab-runner@h_host3.abc.com [X A Engine]
-239 16:28:16 (daemon_c) OUT: "S_1" ra-lnx19.abc.com (2 licenses)
-240 16:28:20 (daemon_c) OUT: "V_A_3" ra@e_host9.abc.com [AP Multi-core (Max. 16 cores)] (4 licenses)
-241 16:28:22 (daemon_c) OUT: "V_A_3" fy@h_host4.abc.com [AP Base] (2 licenses)
-242 16:28:24 (daemon_c) OUT: "S_1" ra@e_host9.abc.com [AP Multi-core (Max. 16 cores)] (4 licenses)
-243 16:28:29 (daemon_c) OUT: "X_A_1" ra@e_host9.abc.com [X A Engine]
-244 16:28:30 (lmgrd) Attempting connection to tertiary redundant server 10.10.10.102
-245 16:28:30 (lmgrd) Failed to connect to tertiary redundant server 10.10.10.102
-246 16:28:30 (lmgrd) Connection attempt to tertiary redundant server 10.10.10.102 failed
-247 16:28:31 (daemon_c) OUT: "V_A_3" ra@e_host9.abc.com [X A Engine]
-248 16:28:34 (daemon_c) OUT: "S_1" ra@e_host9.abc.com [X A Engine]
-249 16:28:36 (daemon_c) OUT: "X_B_2" ra@e_host9.abc.com [X A Engine]
-250 16:28:45 (daemon_c) OUT: "I_1" ww@h_host3.abc.com [ABC2345678901]
-251 16:28:48 (daemon_c) IN: "X_A_1" wyw@t_host6 [X A Engine]
-252 16:28:49 (daemon_c) IN: "X_A_1" wyw@t_host9 [X A Engine]
-253 16:28:50 (daemon_c) IN: "X_B_2" gitlab-runner@h_host3.abc.com [X A Engine]
-254 16:28:51 (lmgrd) Attempting connection to tertiary redundant server 10.10.10.102
-255 16:28:51 (lmgrd) Failed to connect to tertiary redundant server 10.10.10.102
-256 16:28:51 (lmgrd) Connection attempt to tertiary redundant server 10.10.10.102 failed
-257 16:28:51 (daemon_c) OUT: "I_1" lc@h_host3.abc.com [ABC1234567890]
-263 16:29:45 (daemon_c) OUT: "X_A_1" gitlab-runner@h_host3.abc.com [X A Engine]
-265 16:29:51 (lmgrd) Attempting connection to tertiary redundant server 10.10.10.102
-266 16:29:51 (lmgrd) Failed to connect to tertiary redundant server 10.10.10.102
-267 16:29:51 (lmgrd) Connection attempt to tertiary redundant server 10.10.10.102 failed
-257 16:28:51 (daemon_c) OUT: "I_1" lc@h_host3.abc.com [ABC1234567890]
+16:27:48 (daemon_c) OUT: "X_A_1" kk@h_host2 [X A Engine]
+16:27:51 (daemon_c) OUT: "111" fy@h_host2
+16:27:51 (daemon_c) OUT: "V_A_3" fy@h_host2
+16:28:03 (daemon_c) OUT: "X_A_1" wyw@t_host6 [X A Engine]
+16:28:07 (daemon_c) OUT: "Integrated_Metrics_Center" wyw@h_host3.abc.com [ABC3456789012]
+16:28:09 (daemon_c) IN: "X_A_1" es@h_host3.abc.com [X A Engine]
+16:28:09 (daemon_c) IN: "X_A_1" es@h_host3.abc.com [X A Engine]
+16:28:09 (lmgrd) Attempting connection to tertiary redundant server 10.10.10.102
+16:28:09 (lmgrd) Failed to connect to tertiary redundant server 10.10.10.102
+16:28:09 (lmgrd) Connection attempt to tertiary redundant server 10.10.10.102 failed
+16:28:13 (daemon_c) OUT: "Virtuoso_Multi_mode_Simulation" ra@e_host9.abc.com [AP Base] (2 licenses)
+16:28:16 (daemon_c) OUT: "X_A_1" gitlab-runner@h_host3.abc.com [X A Engine]
+16:28:16 (daemon_c) OUT: "X_B_2" gitlab-runner@h_host3.abc.com [X A Engine]
+16:28:16 (daemon_c) OUT: "S_1" ra-lnx19.abc.com (2 licenses)
+16:28:20 (daemon_c) OUT: "V_A_3" ra@e_host9.abc.com [AP Multi-core (Max. 16 cores)] (4 licenses)
+16:28:22 (daemon_c) OUT: "V_A_3" fy@h_host4.abc.com [AP Base] (2 licenses)
+16:28:24 (daemon_c) OUT: "S_1" ra@e_host9.abc.com [AP Multi-core (Max. 16 cores)] (4 licenses)
+16:28:29 (daemon_c) OUT: "X_A_1" ra@e_host9.abc.com [X A Engine]
+16:28:30 (lmgrd) Attempting connection to tertiary redundant server 10.10.10.102
+16:28:30 (lmgrd) Failed to connect to tertiary redundant server 10.10.10.102
+16:28:30 (lmgrd) Connection attempt to tertiary redundant server 10.10.10.102 failed
+16:28:31 (daemon_c) OUT: "V_A_3" ra@e_host9.abc.com [X A Engine]
+16:28:34 (daemon_c) OUT: "S_1" ra@e_host9.abc.com [X A Engine]
+16:28:36 (daemon_c) OUT: "X_B_2" ra@e_host9.abc.com [X A Engine]
+16:28:45 (daemon_c) OUT: "I_1" ww@h_host3.abc.com [ABC2345678901]
+16:28:48 (daemon_c) IN: "X_A_1" wyw@t_host6 [X A Engine]
+16:28:49 (daemon_c) IN: "X_A_1" wyw@t_host9 [X A Engine]
+16:28:50 (daemon_c) IN: "X_B_2" gitlab-runner@h_host3.abc.com [X A Engine]
+16:28:51 (lmgrd) Attempting connection to tertiary redundant server 10.10.10.102
+16:28:51 (lmgrd) Failed to connect to tertiary redundant server 10.10.10.102
+16:28:51 (lmgrd) Connection attempt to tertiary redundant server 10.10.10.102 failed
+16:28:51 (daemon_c) OUT: "I_1" lc@h_host3.abc.com [ABC1234567890]
+16:29:45 (daemon_c) OUT: "X_A_1" gitlab-runner@h_host3.abc.com [X A Engine]
+16:29:51 (lmgrd) Attempting connection to tertiary redundant server 10.10.10.102
+16:29:51 (lmgrd) Failed to connect to tertiary redundant server 10.10.10.102
+16:29:51 (lmgrd) Connection attempt to tertiary redundant server 10.10.10.102 failed
+16:28:51 (daemon_c) OUT: "I_1" lc@h_host3.abc.com [ABC1234567890]
+19:40:27 (daemon_c) DENIED: "T XL" ll@c_host1 
+19:40:28 (daemon_c) QUEUED: "G S" jz@c_host2
+19:49:18 (daemon_c) UNSUPPORTED: "X_A_1" (PORT AT HOST PLUS "X_A_1" (PORT_AT_HOST_PLUS) ns@e_host1.abc.com [X_A_1] (No such feature exists. (-5,346:104 Connection reset by peer"))) 
+19:49:20 (daemon_c) UNSUPPORTED: "V_C_3" (PORT AT HOST PLUS (No such feature exists.) ra@e_host6.abc.com "Connection reset by peer"))
+19:56:03 (daemon_c) DEQUEUED: "Genus_Synthesis" jz@c_host2
