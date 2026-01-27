@@ -1,38 +1,22 @@
-# License Manager Technical Specification (v1.6)
+# License Manager Technical Specification (v1.7)
 
-> This document is the **full authoritative spec** incorporating all decisions from our discussion:
->
-> * **Server–client mode**
-> * **Two GUIs** (Server GUI + Client GUI)
-> * **Client-authoritative configuration**
-> * **Single active server per client (pinned by `server_id`)**
-> * **Offline-capable client ops + durable local journal**
-> * **Idempotent control requests**
-> * **Config revisioning + edit leases**
-> * **TimescaleDB storage + retention**
-> * **Portable “unpack-and-run” release on RHEL7, future RHEL8**
+## 1. System Overview
 
----
+The system is a distributed license operations control plane for FlexLM-style environments, deployed in **server–client mode**:
 
-## 1. System Goals
+* **Server Core (headless)**: orchestration, aggregation, audit, storage, policy, API
+* **Server GUI**: administrative control and visibility
+* **Client Agent (daemon)**: executes lmgrd/lmstat, manages local config, offline operation, journaling
+* **Client GUI**: local operator UI (talks only to Agent)
+* **TimescaleDB**: primary storage (external default; embedded optional)
+* **Simulators**:
 
-The system provides:
-
-* Centralized observability and governance for FlexLM-style license services
-* Safe operational control (start/stop/reread/upload/diagnostics)
-* Time-series analytics (lmstat samples)
-* Offline-capable local operations on clients with later server synchronization
-* Deterministic, auditable behavior
-
-Non-goals:
-
-* Re-implementing FlexLM enforcement
-* Direct server access to client filesystem (no remote shell)
-* GUI-only operation (server core must be headless)
+  * `lmgrd-sim`: deterministic license service simulator
+  * `lmstat-sim`: deterministic lmstat-like output generator consistent with lmgrd-sim
 
 ---
 
-## 2. Architecture Overview
+## 2. Architecture
 
 ### 2.1 Topology
 
@@ -48,8 +32,8 @@ flowchart LR
   subgraph ClientSide[Client Side]
     CGUI[Client GUI]
     AGENT[Agent agentd]
-    LMGRD[lmgrd]
-    LMSTAT[lmstat]
+    LMGRD[lmgrd or lmgrd-sim]
+    LMSTAT[lmstat or lmstat-sim]
   end
 
   SGUI -->|REST/WS| API
@@ -57,581 +41,427 @@ flowchart LR
   CORE --> DB
 
   CGUI -->|Local API| AGENT
-  AGENT --> LMGRD
-  AGENT --> LMSTAT
+
+  AGENT -->|spawn/supervise| LMGRD
+  AGENT -->|periodic call| LMSTAT
 
   AGENT -->|Signed JSON| API
   CORE -->|Control Commands| AGENT
 ```
 
-### 2.2 Trust & Authority Model
+### 2.2 Authority Model
 
-* **Server Core** is authoritative for:
-
-  * global orchestration policy
-  * audit trail in DB
-  * visibility aggregation across clients
-  * server-issued **edit leases**
-* **Client Agent** is authoritative for:
-
-  * **effective configuration** on that host (**client-authoritative config**)
-  * executing operations and recording local events
-* **Server does not own configuration truth**; it stores **snapshots** reported by clients.
-* **Client GUI** is not authoritative; it only interacts with the local agent.
+* **Client-authoritative config**: client effective config is authoritative; server stores snapshots and history.
+* **One active server per client**: bound by `(server_id, server_addr)`.
+* **GUIs propose intent**; **agent executes**; **server stores audit + aggregation**.
 
 ---
 
 ## 3. Components
 
-### 3.1 Server Core (Headless)
+## 3.1 Server Core (Headless)
 
 Responsibilities:
 
-* Ingest telemetry + events from agents
-* Store and query:
+* Accept agent connections (auth + protocol compatibility)
+* Store:
 
-  * time-series lmstat metrics
+  * config snapshots
+  * time-series samples
   * structured operational events
-  * raw records (retention)
-  * config snapshots reported by agents
+  * raw records with retention
   * audit logs
+  * edit leases
 * Dispatch control requests to agents
-* Enforce:
+* Provide APIs to Server GUI
+* Provide parsing services for raw lmstat output into structured samples (versioned parsers)
 
-  * authentication/authorization
-  * edit lease issuance and validation
-  * protocol compatibility
-* Provide APIs for Server GUI and automation
+Constraints:
 
-### 3.2 Server GUI (Admin GUI)
+* No direct access to client filesystem
+* No direct process control on clients (only via agent command channel)
+
+---
+
+## 3.2 Server GUI (Admin GUI)
 
 Responsibilities:
 
-* Fleet view: clients, license servers, status, trends
-* Show last-known client config snapshots and drift/staleness
-* Provide **edit workflow**:
+* Fleet view: agents, health, last-seen, stale
+* License view: features, usage, expiry, per port@server
+* Edit workflow:
 
-  * refresh from client
+  * refresh config from agent
   * acquire edit lease
-  * submit change request to client
-* Initiate global control actions (start/stop/reread/upload/diagnostics) via server core
+  * submit idempotent change request (applied by agent)
+* Global actions: start/stop/restart/reread/apply change_set/diagnostics
 
 Constraints:
 
-* Never talks to agents directly
-* Never reads DB directly
-* Never assumes changes are applied until agent confirms
+* Talks only to Server API (no direct agent connections)
+* Never assumes success until agent confirms
 
-### 3.3 Client Agent (agentd)
+---
+
+## 3.3 Client Agent (agentd)
 
 Responsibilities:
 
-* Run and supervise `lmgrd` and `lmstat`
-* Expose local API to Client GUI
-* Maintain **client-authoritative config** and revision
-* Execute operations:
+* Maintain client-authoritative effective config
+* Run and supervise:
 
-  * start/stop/restart/reread
-  * license upload/apply (local file updates)
-  * diagnostics collection
-* Capture:
+  * vendor `lmgrd` or `lmgrd-sim`
+  * vendor `lmstat` or `lmstat-sim`
+* Capture and ship:
 
-  * `lmstat` stdout
-  * relevant `lmgrd` logs
+  * raw lmstat outputs
   * operation results
-* Persist:
+  * optional lmgrd logs / key excerpts
+* Provide local API to Client GUI
+* Support offline operation:
 
-  * local rotating runtime logs
-  * **durable local event journal** for offline mode
-* Sync:
+  * perform local operations while server is down
+  * persist durable event journal
+  * sync snapshots and events when server reconnects
+* Enforce idempotency and base revision checks for server-initiated changes
 
-  * config snapshots + event journal to server when connected
+---
 
-### 3.4 Client GUI (Local GUI)
+## 3.4 Client GUI (Local GUI)
 
 Responsibilities:
 
-* Display local state from agent:
+* Talks **only** to the local agent API
+* Shows:
 
-  * running status, ports, effective config, local logs view
-  * last-known server snapshot (proxied by agent), including timestamps
-* Allow local operations via agent:
+  * local effective config (rev/hash)
+  * lmgrd status + ports
+  * latest lmstat sample (raw + parsed if available)
+  * local logs (agent/lmgrd)
+  * last-known server snapshot info proxied by agent
+* Allows local operations via agent (including offline), with clear indication of server connectivity and staleness
 
-  * subject to policy and sync status rules defined below
-* Show conflict/difference prompts when server view is stale or when server-issued changes are pending
+---
 
-Constraints:
+## 3.5 Database (TimescaleDB)
 
-* Talks only to local agent
-* No direct server connection
-* No direct DB connection
+Default: external TimescaleDB
+Optional: embedded DB (explicitly enabled; single-node; non-HA)
 
-### 3.5 Database: TimescaleDB (PostgreSQL)
+Used for:
 
-Primary mode: external TimescaleDB
-Optional mode: embedded DB (explicitly enabled; single-node; non-HA)
+* time-series lmstat samples (hypertables)
+* structured events and audit logs
+* raw records with retention
+* config snapshots
+
+---
+
+## 3.6 Simulators
+
+Simulators are mandatory for deterministic testing and development. They are **not** a mock; they are executable substitutes for vendor tooling with stable outputs.
+
+### 3.6.1 lmgrd Simulator (`lmgrd-sim`)
+
+#### Purpose
+
+Provide a deterministic executable that mimics a subset of lmgrd behavior sufficient for:
+
+* agent supervision (start/stop/restart)
+* log generation
+* consistent backing state for lmstat-sim
+* simulating checkout/release and feature counts
+
+#### CLI Compatibility (subset)
+
+Must accept a CLI compatible with the required use cases:
+
+* `lmgrd-sim -c <license.dat> -o <logfile>`
+* (optional) accept `-l` alias if needed for compatibility with scripts
+
+Example:
+
+* `lmgrd-sim -c license.dat -o license.log.20260126`
+
+#### Inputs
+
+* `license.dat` containing dummy feature definitions:
+
+  * feature name
+  * total count
+  * optional expiry date
+  * optional vendor string
+
+A minimal supported dummy format must be specified (see below).
+
+#### Behavior
+
+* On startup:
+
+  * parse `license.dat`
+  * create in-memory feature inventory
+  * open log file and write startup banner
+  * listen on configured port (from license.dat or CLI) if simulation includes request channel
+* While running:
+
+  * accept simulated “checkout” / “release” requests
+  * update usage counts (checked out seats)
+  * log changes and periodic heartbeats
+* On shutdown:
+
+  * flush state and write shutdown banner
+
+#### License Request Channel (simulation)
+
+Because real FlexLM protocol is proprietary, the simulator uses a **simple text/JSON TCP protocol** (local loopback or configurable port), e.g.:
+
+* `CHECKOUT {"feature":"foo","user":"u1","host":"h1"}`
+* `RELEASE {"feature":"foo","user":"u1","host":"h1"}`
+* `STATUS`
+
+Response examples:
+
+* `OK {"granted":1,"in_use":3,"total":10}`
+* `DENY {"reason":"NO_FREE_SEATS","in_use":10,"total":10}`
+
+This channel is only required to support deterministic tests and sample generation.
+
+#### Minimal `license.dat` dummy grammar (spec-defined)
+
+To avoid dependency on real FLEX syntax, define a small, parseable format, e.g.:
+
+```
+PORT 27000
+FEATURE alpha 10 EXPIRES 2026-12-31
+FEATURE beta  3  EXPIRES 2026-06-30
+FEATURE gamma 25
+```
+
+Agent tests and lmstat-sim must rely on this grammar.
+
+---
+
+### 3.6.2 lmstat Simulator (`lmstat-sim`)
+
+#### Purpose
+
+Generate `lmstat`-like textual output that:
+
+* is deterministic
+* reflects current lmgrd-sim state
+* is parseable by your server parser
+* supports periodic sampling by agent
+
+#### CLI Compatibility (subset)
+
+Must accept:
+
+* `lmstat-sim -c <port@server> -a -i`
+* `lmstat-sim -c <port@server> -f <feature_name> -i`
+
+Where:
+
+* `-i` means “include usage details” (or a stable verbose mode)
+* `-a` means “all features”
+* `-f` filters a feature
+
+#### Behavior
+
+* Connect to lmgrd-sim request channel (or read its state file/socket)
+* Generate text output in a stable, testable format that approximates `lmstat`
+
+Example output requirements (not exact FlexLM, but stable):
+
+* must include:
+
+  * server identity (host, port)
+  * timestamp
+  * feature list with `total` and `in_use`
+  * optionally list active checkouts if `-i`
+
+#### Determinism Requirements
+
+For a given:
+
+* lmgrd-sim state
+* same CLI args
+
+Output must be identical except for explicitly marked timestamp fields (which can be fixed in test mode).
 
 ---
 
 ## 4. Configuration Model (Client-Authoritative)
 
-### 4.1 Configuration Ownership
+### 4.1 Client Effective Config
 
-**Effective config lives on the client agent** and is the only authoritative source of configuration.
+Client agent maintains:
 
-Server stores:
-
-* snapshots of client config (last-known)
-* desired proposals (optional queue), but not authoritative until applied by client
-
-### 4.2 Config Revisions
-
-Each client agent maintains:
-
-* `config_rev` (monotonic integer)
-* `config_hash` (hash of normalized config)
+* `config_rev` (monotonic)
+* `config_hash`
 * `last_applied_time`
-* `server_binding`:
+* `server_binding` = `(server_id, server_addr)`
+* tool paths: lmgrd path, lmstat path
+* license assets paths: license.dat, option file, log path
+* managed endpoints: list of `port@server` items
 
-  * `server_id` (UUID)
-  * `server_addr` (host:port)
+Server stores **snapshots** only:
 
-Server stores last-known for each agent:
-
-* `reported_config_rev`
-* `reported_config_hash`
+* `reported_rev/hash`
+* payload (optional redacted fields)
 * `reported_at`
-
-### 4.3 Local Config Files
-
-#### 4.3.1 Server local config file (bootstrap only)
-
-Stored locally, schema-validated:
-
-* API listen address/port
-* DB connection parameters (or embedded DB path)
-* server log path + rotation settings
-* retention policy defaults
-* security material paths (certs/keys)
-
-#### 4.3.2 Client local config file (bootstrap + identity)
-
-Stored locally, schema-validated:
-
-* `server_id` + `server_addr` binding
-* agent identity (agent_id, hostname)
-* local runtime paths:
-
-  * lmgrd path
-  * lmstat path
-  * log path
-  * license.dat path
-  * options file path
-  * port@server mapping(s)
-
-**Note:** the above are still *client-authoritative*. The server stores snapshots for visibility.
 
 ---
 
 ## 5. Single Active Server Binding
 
-### 5.1 Binding Rules
-
-* Each agent is bound to exactly one active server identified by `(server_id, server_addr)`.
-* Agent will:
-
-  * accept commands only from the bound `server_id`
-  * reject commands from unknown server IDs
-* Rebinding requires explicit local operator action on the client (Client GUI) or a secured “rebind procedure”.
-
-### 5.2 Why This Exists
-
-Prevents split-brain control if:
-
-* server address changes
-* old server instance returns online
-* multiple servers accidentally exist
+* Agent accepts commands only from the bound `server_id`.
+* Rebinding requires explicit local operator action (or a secured rebind procedure).
+* Prevents split-brain control when servers change.
 
 ---
 
-## 6. Protocol Version Compatibility
+## 6. Protocol Compatibility
 
-### 6.1 Protocol Negotiation
+* Use protocol-version negotiation:
 
-All messages include:
-
-* `protocol_version` (integer or semver-like)
-* `agent_software_version`
-* `server_software_version`
-
-Server enforces a compatibility window:
-
-* `min_supported_protocol <= protocol_version <= max_supported_protocol`
-
-If out of window:
-
-* connection rejected with explicit error
-* no partial operation
-
-**No requirement for exact binary version match** (supports rolling upgrades).
+  * server declares `min_supported_protocol`, `max_supported_protocol`
+  * agent sends `protocol_version`
+* If outside range: reject.
 
 ---
 
-## 7. Sync State Model
+## 7. Sync, Revisions, and Editing
 
-The system uses **revisioned snapshots** and local event journaling rather than “no-conflict assumptions”.
-
-### 7.1 Sync States (Agent Computed, Server Confirmed)
+### 7.1 Sync States
 
 ```mermaid
 stateDiagram-v2
   [*] --> UNKNOWN
-  UNKNOWN --> IN_SYNC: connected + rev matches
-  UNKNOWN --> CLIENT_AHEAD: connected + client rev > server snapshot
-  UNKNOWN --> SERVER_STALE: connected + server snapshot older than ttl
-
-  IN_SYNC --> CLIENT_AHEAD: local change
-  CLIENT_AHEAD --> IN_SYNC: upload snapshot ok
-  IN_SYNC --> SERVER_STALE: missed heartbeats
-  SERVER_STALE --> IN_SYNC: reconnect + reconcile
+  UNKNOWN --> IN_SYNC: snapshot uploaded and acked
+  IN_SYNC --> CLIENT_AHEAD: local change performed
+  CLIENT_AHEAD --> IN_SYNC: reconnect sync success
+  IN_SYNC --> STALE: missed heartbeats
+  STALE --> IN_SYNC: reconnect + new snapshot
 ```
 
-**Interpretation**
+### 7.2 Server GUI Edit Lease (Concurrency control)
 
-* `IN_SYNC`: server snapshot equals client effective config
-* `CLIENT_AHEAD`: client has changes not yet synced to server
-* `SERVER_STALE`: server view is old (no recent report)
-* `UNKNOWN`: startup, first connect, or insufficient data
+* server issues per-client `lease_id` with TTL
+* at most one active lease per client
+* required for server-initiated config proposals
 
-> Note: With client-authoritative config, “server ahead” is typically not used; server can propose changes but they only become real after client applies.
+### 7.3 Idempotent Change Requests
 
----
+Every change request includes:
 
-## 8. Edit & Apply Workflow (Server GUI → Client)
-
-You required: *server edits must refresh from client and apply through client (client stays authoritative).*
-
-### 8.1 Edit Lease (Concurrency Control)
-
-Server issues per-client leases:
-
-* `lease_id` (UUID)
-* `client_id`
-* `issued_at`
-* `expires_at` (TTL, e.g., 60s)
-* `issued_to_user` (optional metadata)
-
-Rules:
-
-* At most one active lease per client
-* Lease required for server-initiated config changes
-* Lease expiration invalidates in-flight edits
-
-### 8.2 Refresh-Then-Edit
-
-When admin clicks “Edit”:
-
-1. Server GUI requests **refresh**:
-
-   * server asks agent for current config snapshot
-2. Server stores snapshot in DB (if newer)
-3. Server GUI requests **edit lease**
-4. Server GUI displays config at `(config_rev, config_hash, reported_at)`
-
-### 8.3 Apply Change Request (Idempotent)
-
-A server-initiated change is a **proposal** that becomes authoritative only after the client applies it.
-
-Change request includes:
-
-* `change_id` (UUID)
+* `change_id`
 * `lease_id`
 * `base_config_rev`
-* `change_set` (atomic set of modifications)
-* `server_id`
-* `protocol_version`
+* `change_set`
 
 Agent applies only if:
 
-* `server_id` matches binding
-* `lease_id` valid and unexpired (server validated; agent may optionally re-check TTL)
-* `base_config_rev == current config_rev` (prevents stale edits)
-* `change_id` not already applied (idempotency)
+* `change_id` not already applied
+* `base_config_rev == current_config_rev`
 
-If applied:
+If apply succeeds:
 
-* agent updates local files atomically
 * agent increments `config_rev`
-* agent records event in local journal
-* agent reports new snapshot to server
-
-### 8.4 Sequence
-
-```mermaid
-sequenceDiagram
-  Admin->>ServerGUI: Click Edit
-  ServerGUI->>Server: refresh_config(client)
-  Server->>Agent: request_config_snapshot
-  Agent-->>Server: snapshot(config_rev, hash, payload)
-  Server-->>ServerGUI: snapshot displayed
-  ServerGUI->>Server: acquire_lease(client)
-  Server-->>ServerGUI: lease_id
-
-  Admin->>ServerGUI: Submit changes
-  ServerGUI->>Server: propose_change(lease_id, base_rev, change_set, change_id)
-  Server->>Agent: apply_change(change_id, lease_id, base_rev, change_set)
-  Agent-->>Server: result(success, new_rev, new_hash)
-  Server->>DB: store snapshot + audit
-  Server-->>ServerGUI: success + audit reference
-```
+* writes local journal event
+* reports new snapshot to server
 
 ---
 
-## 9. Offline Local Operations (Client GUI → Agent)
+## 8. Offline Local Operations
 
-### 9.1 Local Operations Policy
-
-The client must be operable independently. When server is offline:
-
-* client GUI may still perform local actions via agent
-* all such actions must be recorded in local durable journal
-* server reconciliation occurs automatically when reconnected
-
-### 9.2 Allowed Actions When Server Offline
-
-Default safe policy (can be configured later):
-
-* ✅ start/stop/restart lmgrd (local)
-* ✅ reread (local)
-* ✅ diagnostics collection
-* ✅ local edits of license.dat/options **if performed as a change_set** and journaled
-
-> Because you explicitly want independence, risky actions are allowed offline — but must be journaled and later uploaded.
-
-### 9.3 Local Change Sets & Journaling
-
-Agent must store an append-only durable journal (recommended SQLite):
-
-* `event_id`
-* `event_time`
-* `change_id` (optional)
-* `action_type`
-* `config_rev_before/after`
-* checksums of changed artifacts (license.dat/options)
-* apply result + reason
-* `pending_upload` flag
-
-Rotating text logs are **not** sufficient as an audit source.
+* Client GUI operates through agent even when server offline
+* All local operations are journaled durably (SQLite recommended)
+* On reconnect: agent uploads delta journal + latest snapshot
 
 ---
 
-## 10. Reconnect & Automatic Sync (Client → Server)
+## 9. Data Storage (TimescaleDB)
 
-Your rule: *when server becomes available again, client changes automatically sync to server; server view is derived from client.*
+### 9.1 Logical Tables
 
-### 10.1 Reconnect Sync Steps
+Hypertables:
 
-On reconnect:
+* `lmstat_samples`
+* `license_usage_samples` (optional derived)
 
-1. Agent authenticates to server and validates `server_id` and protocol window
-2. Agent sends:
+Tables:
 
-   * current config snapshot (`config_rev`, `hash`, payload)
-   * local journal events since last acknowledged upload (bounded)
-3. Server:
+* `agents`
+* `config_snapshots`
+* `raw_records` (retention N days)
+* `events_structured`
+* `audit_log`
+* `edit_leases`
+* `control_requests`
+* `control_results`
 
-   * stores snapshot
-   * stores uploaded events (raw + structured)
-   * marks agent as “current” at time T
-4. Server responds with ack and last stored journal offset
+### 9.2 Retention
 
-### 10.2 Sequence
+* raw records retained N days (configurable)
+* time-series retained long-term (configurable)
+* audit retained long-term
 
-```mermaid
-sequenceDiagram
-  Agent->>Server: connect(server_id, protocol_version)
-  Server-->>Agent: accept + constraints
-  Agent->>Server: sync(snapshot + journal_delta)
-  Server->>DB: persist snapshot + events
-  Server-->>Agent: ack(last_event_id)
-```
+Server runtime logs remain file-rotated (diagnostic only).
 
 ---
 
-## 11. Conflict Handling (Reduced, But Still Defined)
+## 10. Logging
 
-Even in a client-authoritative model, “conflicts” can occur as **stale edits or failed applies**.
+Client:
 
-This spec defines “conflict” narrowly:
+* rotating runtime logs
+* optional lmgrd logs
+* durable event journal
 
-* **Stale edit**: server proposes change with `base_config_rev` not equal to current client rev → agent rejects
-* **Apply failure**: agent cannot apply change_set (permission/disk/validation) → recorded and visible
+Server:
 
-Resolution:
-
-* Server GUI must show:
-
-  * rejection reason
-  * current client rev/hash
-* Operator retries after refresh + new lease
-
-> There is no “merge”; server does not override client authority. The operator fixes and re-applies.
+* rotating runtime logs
+* authoritative operational data in DB
 
 ---
 
-## 12. Data Storage Specification (TimescaleDB)
+## 11. Control Actions
 
-### 12.1 Data Classes
+Supported actions (initiated by either GUI, executed by agent):
 
-```mermaid
-flowchart LR
-  RAW[Raw Records]
-  EVT[Structured Events]
-  TS[Time-series Samples]
-  SNAP[Config Snapshots]
-  AUD[Audit Log]
-
-  RAW --> EVT
-  RAW --> TS
-  SNAP --> AUD
-  EVT --> AUD
-```
-
-### 12.2 Tables / Hypertables (Logical)
-
-* Hypertables:
-
-  * `lmstat_samples` (time-series)
-  * `license_usage_samples` (time-series; derived)
-* Regular tables:
-
-  * `agents`
-  * `config_snapshots`
-  * `control_requests`
-  * `control_results`
-  * `events_structured`
-  * `raw_records`
-  * `audit_log`
-  * `edit_leases`
-
-### 12.3 Retention
-
-* `raw_records`: retained N days (configurable)
-* time-series: long-term (configurable)
-* audit: long-term
-
-Server runtime logs:
-
-* **file-based rotating logs** (not in DB)
-
----
-
-## 13. Logging Specification
-
-### 13.1 Client
-
-* `agentd` runtime logs:
-
-  * rotating file logs (path + max size + rotation count)
-* `lmgrd` logs:
-
-  * captured as files, optionally tailed/forwarded as raw records (with retention)
-* operational journal:
-
-  * durable and non-rotating (bounded by retention/compaction policy)
-
-### 13.2 Server
-
-* server runtime logs:
-
-  * rotating file logs (path + max size + rotation count)
-* authoritative operational records:
-
-  * in TimescaleDB (events + audits)
-
----
-
-## 14. Control Actions
-
-Supported operations (initiated by either GUI, executed by agent):
-
-* start lmgrd
-* stop lmgrd
-* restart lmgrd
+* start/stop/restart lmgrd
 * reread license
-* apply change_set (config/files)
+* apply change_set (includes license.dat/options/log path/port config)
 * diagnostics
 
-### 14.1 Idempotency
-
-All control requests use:
-
-* `request_id` / `change_id` (UUID)
-
-Agent must:
-
-* store applied IDs (at least N days or bounded LRU)
-* return same result on duplicate
+All control requests are idempotent.
 
 ---
 
-## 15. Testing Requirements
+## 12. Testing Requirements
 
-### 15.1 Test Types (Mandatory)
+Mandatory:
 
-```mermaid
-flowchart TD
-  SIM[Simulators]
-  PARSER[Parser Golden Tests]
-  PROTO[Protocol Compatibility Tests]
-  INT[Integration Tests]
-  MIG[Migration/Replay Tests]
+* simulator-backed integration tests:
 
-  SIM --> PARSER
-  SIM --> INT
-  PROTO --> INT
-  MIG --> INT
-```
-
-Minimum requirements:
-
-* Parsers: golden fixtures (lmstat output → structured output)
-* Protocol: negotiation tests across supported versions
-* Idempotency: duplicate request tests
-* Leases: concurrent edit rejection tests
-* Offline mode:
-
-  * local change journal persistence across restart
-  * reconnect upload correctness
-* TimescaleDB retention: raw record expiration does not break aggregates
+  * start lmgrd-sim
+  * run lmstat-sim periodically
+  * verify agent shipping raw output
+  * verify server parsing and DB storage
+* protocol negotiation tests
+* idempotency tests
+* offline journal persistence tests
+* retention policy tests
 
 ---
 
-## 16. Simulator Suite
-
-### 16.1 lmgrd Simulator
-
-* deterministic state model
-* produces predictable logs/output
-* supports feature capacities, checkout/release, expiries
-
-### 16.2 lmstat Simulator
-
-* generates `lmstat`-like text output
-* consistent with simulated lmgrd state
-* used for parser and integration fixtures
-
----
-
-## 17. Packaging & Portability (RHEL7 first)
-
-### 17.1 Release Requirements
+## 13. Packaging & Portability
 
 * No installer
-* Unpack into any folder and run
-* Must run on RHEL7; target compatibility with RHEL8
-
-### 17.2 Recommended Layout
+* Unpack-and-run
+* Target RHEL7 first; compatible with RHEL8 later
+* Miniforge runtime allowed; must be relocatable
+* Release layout (recommended):
 
 ```mermaid
 flowchart TD
@@ -649,35 +479,13 @@ flowchart TD
   ROOT --> DATA
 ```
 
-Rules:
-
-* no hard-coded absolute paths
-* runtime uses paths relative to release root
-* any embedded DB lives under `data/` and is explicitly enabled
-
 ---
 
-## 18. Security (Baseline)
+## 14. Security (Baseline)
 
-* Agent authenticates to server using credentials bound to `server_id` + `agent_id`
-* Server GUI authenticates as user (separate from agents)
-* All control actions produce an audit log record
-* Secrets:
-
-  * never sent in telemetry
-  * never logged in plaintext
-
-(Full RBAC can be specified later; the spec requires separation of agent identity vs user identity.)
+* agent auth is separate from user auth
+* agent bound to `server_id`
+* server GUI actions audited
+* secrets never transmitted in telemetry
 
 ---
-
-## 19. Summary of Key Invariants
-
-1. **Client-authoritative config**: server stores snapshots, not truth.
-2. **Single active server per client** via `server_id` binding.
-3. **Server GUI edits must refresh + lease + base_rev**.
-4. **All requests are idempotent**.
-5. **Offline operations are durable** (journal) and sync automatically on reconnect.
-6. **Client GUI talks only to agent** (agent proxies server snapshot).
-7. **TimescaleDB is primary storage**, with retention for raw records.
-8. **Portable unpack-and-run deployment** on RHEL7 baseline.
