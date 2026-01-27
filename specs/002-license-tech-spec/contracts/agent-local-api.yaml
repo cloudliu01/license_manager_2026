@@ -1,0 +1,87 @@
+openapi: 3.0.3
+info:
+  title: License Manager Agent Local API
+  version: 1.0.0
+paths:
+  /v1/status:
+    get:
+      summary: Get local agent status
+      responses:
+        "200":
+          description: Status
+  /v1/config:
+    get:
+      summary: Get effective local configuration
+      responses:
+        "200":
+          description: Current config
+  /v1/config/changes:
+    post:
+      summary: Propose a local config change (offline-capable)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LocalConfigChange"
+      responses:
+        "202":
+          description: Change accepted
+  /v1/control-requests:
+    post:
+      summary: Execute a local control action
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LocalControlRequest"
+      responses:
+        "202":
+          description: Control request accepted
+  /v1/server-snapshot:
+    get:
+      summary: Get last-known server snapshot (proxied)
+      responses:
+        "200":
+          description: Server snapshot metadata
+  /v1/rebind:
+    post:
+      summary: Rebind agent to a new server identity
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RebindRequest"
+      responses:
+        "202":
+          description: Rebind initiated
+components:
+  schemas:
+    LocalConfigChange:
+      type: object
+      required: [change_id, base_config_rev, change_set]
+      properties:
+        change_id:
+          type: string
+        base_config_rev:
+          type: integer
+        change_set:
+          type: object
+    LocalControlRequest:
+      type: object
+      required: [request_id, action_type]
+      properties:
+        request_id:
+          type: string
+        action_type:
+          type: string
+    RebindRequest:
+      type: object
+      required: [server_id, server_addr]
+      properties:
+        server_id:
+          type: string
+        server_addr:
+          type: string

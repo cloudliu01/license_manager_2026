@@ -111,6 +111,8 @@ verify the audit trail shows an end-to-end trace from intent to outcome.
   configurable retention for raw records and audit history.
 - **FR-013**: The release MUST support unpack-and-run deployment on RHEL7 with
   forward compatibility for RHEL8.
+- **FR-014**: The system MUST include deterministic lmgrd and lmstat simulators
+  for replayable fixtures and test coverage of parsing and control flows.
 
 ### Constitutional Constraints *(mandatory if applicable)*
 
@@ -144,10 +146,12 @@ verify the audit trail shows an end-to-end trace from intent to outcome.
 
 ## Assumptions
 
-- The project will maintain two GUIs: a Server GUI for fleet control and a
-  Client GUI for local operations.
+- The project will maintain two desktop GUIs (PyQt6): a Server GUI for fleet
+  control and a Client GUI for local operations.
 - Configuration changes are applied only after client confirmation.
 - Data retention windows are configurable by operators and documented in policy.
+- GUIs are replaceable clients; a future Java GUI must be able to use the same
+  APIs without requiring changes to server core or agent behavior.
 
 ## Success Criteria *(mandatory)*
 
