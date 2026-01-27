@@ -1,0 +1,51 @@
+openapi: 3.0.3
+info:
+  title: License Manager Agent Local API
+  version: 1.0.0
+  description: Local API for the Client GUI to communicate with the agent daemon.
+
+paths:
+  /status:
+    get:
+      summary: Get current agent and license status
+      responses:
+        '200':
+          description: Status details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentStatus'
+
+  /control:
+    post:
+      summary: Execute a local control action
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LocalAction'
+      responses:
+        '200':
+          description: Action result
+
+components:
+  schemas:
+    AgentStatus:
+      type: object
+      properties:
+        config_rev: { type: integer }
+        server_connected: { type: boolean }
+        services:
+          type: array
+          items:
+            type: object
+            properties:
+              name: { type: string }
+              status: { type: string }
+        last_sync: { type: string, format: date-time }
+
+    LocalAction:
+      type: object
+      required: [action]
+      properties:
+        action: { type: string, enum: [START, STOP, RESTART, REREAD] }
