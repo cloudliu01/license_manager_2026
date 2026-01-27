@@ -31,7 +31,19 @@
 
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
-[Gates determined based on constitution file]
+- [ ] Control plane focus: global correctness over local convenience; system-level view.
+- [ ] Single source of truth defined for license state, control intent, history.
+- [ ] Observability before automation: actions traceable; derived state explainable.
+- [ ] Determinism over cleverness: behavior replayable and auditable.
+- [ ] Authority boundaries explicit: no inferred intent or implicit escalation.
+- [ ] Humans are part of the system: operator intent/arbitration/override supported.
+- [ ] History preserved: schema evolution keeps meaning; records remain queryable.
+- [ ] Failure is first-class: partial failure, uncertainty, and absence represented.
+- [ ] Infrastructure reality accounted for: heterogeneity, networks, clock skew, legacy.
+- [ ] Boring tech preferred; novelty justified by reduced operational risk.
+- [ ] Portability without fragility: errors surfaced; guarantees not weakened.
+- [ ] Irreversible decisions have rollback or escape hatches.
+- [ ] Constitution above spec: exceptions documented with explicit waivers.
 
 ## Project Structure
 

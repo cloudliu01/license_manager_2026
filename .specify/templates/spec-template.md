@@ -95,6 +95,23 @@
 - **FR-006**: System MUST authenticate users via [NEEDS CLARIFICATION: auth method not specified - email/password, SSO, OAuth?]
 - **FR-007**: System MUST retain user data for [NEEDS CLARIFICATION: retention period not specified]
 
+### Constitutional Constraints *(mandatory if applicable)*
+
+<!--
+  ACTION REQUIRED: Map requirements to constitution principles. If a constraint is
+  not applicable, mark it N/A with a brief rationale.
+-->
+
+- **CC-001**: Feature MUST preserve a single source of truth for state/intent/history.
+- **CC-002**: Feature MUST make actions traceable and derived state explainable.
+- **CC-003**: Feature MUST keep behavior deterministic and replayable where applicable.
+- **CC-004**: Feature MUST define explicit authority grants/exercise/records.
+- **CC-005**: Feature MUST document operator intent, ambiguity handling, and override path.
+- **CC-006**: Feature MUST preserve historical meaning across schema changes.
+- **CC-007**: Feature MUST represent partial failure, uncertainty, and absent data explicitly.
+- **CC-008**: Feature MUST account for real-world infra constraints (skew, networks, legacy).
+- **CC-009**: Feature MUST include rollback/escape mechanisms for irreversible decisions.
+
 ### Key Entities *(include if feature involves data)*
 
 - **[Entity 1]**: [What it represents, key attributes without implementation]
