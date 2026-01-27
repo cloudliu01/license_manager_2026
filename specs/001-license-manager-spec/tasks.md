@@ -16,11 +16,11 @@ description: "Task list for License Manager Specification"
 
 **Purpose**: Project initialization and basic structure
 
-- [ ] T001 Create top-level directories `server/`, `client/`, `simulators/`, `tests/`
-- [ ] T002 Initialize server dependencies in `server/pyproject.toml`
-- [ ] T003 [P] Initialize client dependencies in `client/pyproject.toml`
-- [ ] T004 [P] Initialize simulators dependencies in `simulators/pyproject.toml`
-- [ ] T005 [P] Add test configuration in `tests/pytest.ini`
+- [X] T001 Create top-level directories `server/`, `client/`, `simulators/`, `tests/`
+- [X] T002 Initialize server dependencies in `server/pyproject.toml`
+- [X] T003 [P] Initialize client dependencies in `client/pyproject.toml`
+- [X] T004 [P] Initialize simulators dependencies in `simulators/pyproject.toml`
+- [X] T005 [P] Add test configuration in `tests/pytest.ini`
 
 ---
 
