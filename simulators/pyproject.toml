@@ -15,6 +15,7 @@ dependencies = [
 [project.scripts]
 lmgrd-sim = "license_manager_simulators.lmgrd.cli:main"
 lmstat-sim = "license_manager_simulators.lmstat.cli:main"
+sim-workload = "license_manager_simulators.workload.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
