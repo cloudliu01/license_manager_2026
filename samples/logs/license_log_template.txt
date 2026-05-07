@@ -1,0 +1,232 @@
+16:24:11 (lmgrd) ------------------------------
+16:24:11 (lmgrd) 
+16:24:11 (lmgrd) Please Note:
+16:24:11 (lmgrd) This log is intended for debug purposes only.
+16:24:11 (lmgrd) In order to capture accurate license
+16:24:11 (lmgrd) usage data into an organized repository,
+16:24:11 (lmgrd) please enable report logging. Use Flexera's
+16:24:11 (lmgrd) software license administration solution,
+16:24:11 (lmgrd) FlexNet Manager, to readily gain visibility
+16:24:11 (lmgrd) into license usage data and to create
+16:24:11 (lmgrd) insightful reports on critical information like
+16:24:11 (lmgrd) license availability and usage. FlexNet Manager
+16:24:11 (lmgrd) can be fully automated to run these reports on
+16:24:11 (lmgrd) schedule and can be used to track license
+16:24:11 (lmgrd) servers and usage across a heterogeneous
+16:24:11 (lmgrd) network of servers including Windows NT, Linux
+16:24:11 (lmgrd) and UNIX.
+16:24:11 (lmgrd) 
+16:24:11 (lmgrd) ------------------------------
+16:24:11 (lmgrd) 
+16:24:11 (lmgrd) 
+16:24:11 (lmgrd) Server's System Date and Time: Tue Jan 20 2026 16:24:11 PST
+16:24:11 (lmgrd) Changing message security level from -1 to 8
+16:24:11 (lmgrd) SLOG: Summary LOG statistics is enabled.
+16:24:11 (lmgrd) The license server manager (lmgrd) running as root:
+16:24:11 (lmgrd) and this is a potential security problem
+16:24:11 (lmgrd) and is not recommended.
+16:24:11 (lmgrd) FlexNet Licensing (v11.19.5.1 build 293554 x64-linux) started on 10.10.10.101 (linux) (1/20/2026)
+16:24:11 (lmgrd) Copyright (c) 1988-2023 Flexera. All Rights Reserved.
+16:24:11 (lmgrd) World Wide Web: http://www.flexerasoftware.com
+16:24:11 (lmgrd) License file(s): ./license.dat
+16:24:11 (lmgrd) lmd_tcp-port 9876
+16:24:11 (lmgrd) (@lmgrd-SLOG@) ================================================
+16:24:11 (lmgrd) (@lmgrd-SLOG@) == LMGRD ===
+16:24:11 (lmgrd) (@lmgrd-SLOG@) Start-Date: Tue Jan 20 2026 16:24:11 PST
+16:24:11 (lmgrd) (@lmgrd-SLOG@) PID: 336535
+16:24:11 (lmgrd) (@lmgrd-SLOG@) LMGRD Version: v11.19.5.1 build 293554 x64-linux (build 293554 (ipv6))
+16:24:11 (lmgrd) (@lmgrd-SLOG@) 
+16:24:11 (lmgrd) (@lmgrd-SLOG@) == Network Info ===
+16:24:11 (lmgrd) (@lmgrd-SLOG@) Listening port 9876
+16:24:11 (lmgrd) (@lmgrd-SLOG@) 
+16:24:11 (lmgrd) (@lmgrd-SLOG@) == Startup Info ===
+16:24:11 (lmgrd) (@lmgrd-SLOG@) Server Configuration: 3-Server Certificate
+16:24:11 (lmgrd) (@lmgrd-SLOG@) Command-line options used at LS startup: -c ./license.dat -l ./logs/license.log.2026-01-20
+16:24:11 (lmgrd) (@lmgrd-SLOG@) License file(s) used: ./license.dat
+16:24:11 (lmgrd) (@lmgrd-SLOG@) ================================================
+16:24:11 (lmgrd) Redundant server configuration enabled. Attempting to establish quorum...
+16:24:11 (lmgrd) Trying to establish connections to other redundant servers...
+16:24:11 (lmgrd) Attempting connection to secondary redundant server 10.10.10.102
+16:24:11 (lmgrd) Attempting connection to tertiary redundant server 10.10.10.103
+16:24:11 (lmgrd) Failed to connect to tertiary redundant server 10.10.10.103
+16:24:11 (lmgrd) Connection attempt to tertiary redundant server 10.10.10.103 failed
+16:24:12 (lmgrd) Established connection to secondary redundant server 10.10.10.102
+16:24:12 (lmgrd) Redundant server quorum established. Master is 10.10.10.101
+16:24:12 (lmgd) Starting vendor daemons ...
+16:24:12 (lmgd) Started daemon_c (internet tcp port 34181 pid 3365537)
+16:24:12 (lmgd) Started daemon_v (internet tcp port 47543 pid 3365538)
+16:24:12 (daemon_v) FlexNet Licensing version v11.19.5.1 build 293554 x64_linux
+16:24:12 (daemon_v) Vendor_c kit version: 24.01-p001
+16:24:12 (daemon_v) executing tcp override dynamic setting
+16:24:12 (daemon_v) No TCP override detected
+16:24:12 (daemon_v) SLOG: Summary LOG statistics is enabled.
+16:24:12 (daemon_v) SLOG: FNPLS-INTERNAL-CKPT1
+16:24:12 (daemon_v) SLOG: VM Status: 4
+16:24:12 (daemon_v) SLOG: FNPLS-INTERNAL-CKPT5
+16:24:12 (daemon_v) SLOG: TPM Status: 0
+16:24:12 (daemon_v) SLOG: FNPLS-INTERNAL-CKPT6
+16:24:12 (daemon_v) Server started on 10.10.10.101 for: conformal_datapath
+16:24:12 (daemon_v) conformal_ldd  conformal_lec  conformal_lvr
+16:24:12 (daemon_v) conformal_vhd  conformal_vlg
+16:24:12 (daemon_v) ALL FEATURE lines for daemon_v behave like INCREMENT lines
+16:24:12 (daemon_v) All feature lines for daemon_v behave like INCREMENT lines
+16:24:12 (daemon_v) All FEATURE lines for daemon_v behave like INCREMENT lines
+16:24:12 (daemon_c) FlexNet Licensing version v11.19.5.1 build 293554 x64_linux
+16:24:12 (daemon_c) Vendor_c kit version: 24.01-p001
+16:24:12 (daemon_c) PST time offset: -28800
+16:24:12 (daemon_v) EXTERNAL FILTERS are OFF
+16:24:12 (lmgd) daemon_v using TCP-port 47543
+16:24:12 (daemon_v) Changing message security level from -1 to 0
+16:24:12 (daemon_v) SLOG: Statistics Log Frequency is 240 minute(s).
+16:24:12 (daemon_v) SLOG: TS update poll interval is 600 seconds.
+16:24:12 (daemon_v) SLOG: Activation borrow reclaim percentage is 0.
+16:24:12 (daemon_v) (@daemon_v-SLOG@) ================================================================
+16:24:12 (daemon_v) (@daemon_v-SLOG@) === Vendor Daemon ===
+16:24:12 (daemon_v) (@daemon_v-SLOG@) Vendor daemon: daemon_v
+16:24:12 (daemon_v) (@daemon_v-SLOG@) Start-Date: Tue Jan 20 2020 16:24:12 PST
+16:24:12 (daemon_v) (@daemon_v-SLOG@) PID: 3365538
+16:24:12 (daemon_v) (@daemon_v-SLOG@) VD Version: v11.19.5.1 build 293554 x64_linux ( build 293554 (ipv6))
+16:24:12 (daemon_v) (@daemon_v-SLOG@)
+16:24:12 (daemon_v) (@daemon_v-SLOG@) === StartUp/Restart Info ===
+16:24:12 (daemon_v) (@daemon_v-SLOG@) Options file used: None
+16:24:12 (daemon_v) (@daemon_v-SLOG@) Is vendor daemon a CVD: No
+16:24:12 (daemon_v) (@daemon_v-SLOG@) Is FlexNet Licensing Service installed and compatible: No
+16:24:12 (daemon_v) (@daemon_v-SLOG@) FlexNet Licensing Service Version: -NA-
+16:24:12 (daemon_v) (@daemon_v-SLOG@) Is TS accessed: No
+16:24:12 (daemon_v) (@daemon_v-SLOG@) TS access time: -NA-
+16:24:12 (daemon_v) (@daemon_v-SLOG@) Number of VD restarts since LS startup: 0
+16:24:12 (daemon_v) (@daemon_v-SLOG@)
+16:24:12 (daemon_v) (@daemon_v-SLOG@) === Network Info ===
+16:24:12 (daemon_v) (@daemon_v-SLOG@) Listening port: 47543
+16:24:12 (daemon_v) (@daemon_v-SLOG@) Daemon select timeout (in seconds): 1
+16:24:12 (daemon_v) (@daemon_v-SLOG@)
+16:24:12 (daemon_v) (@daemon_v-SLOG@) === Host Info ===
+16:24:12 (daemon_v) (@daemon_v-SLOG@) Host used in license file: 10.10.10.101
+16:24:12 (daemon_v) (@daemon_v-SLOG@) HostID's node-locked in 3Server license file: 352 856 467
+16:24:12 (daemon_v) (@daemon_v-SLOG@) HostID of the License Server: 352
+16:24:12 (daemon_v) (@daemon_v-SLOG@) Running on Hypervisor: Unknown Hypervisor
+16:24:12 (daemon_v) (@daemon_v-SLOG@) ================================================================
+16:24:12 (daemon_v) Ecomms: Encrypted Communication disabled
+16:24:12 (daemon_v) TCP_NODELAY NOT enabled
+16:24:12 (daemon_v) Listener Thread: running
+16:24:12 (daemon_c) VENDOR_C_INFO_MSG: Time check: 01/20/2026 16:24:12.00000
+16:24:12 (daemon_c) VENDOR_C_INFO_MSG: Time check: 01/20/2026 16:24:12.000
+16:24:14 (daemon_c) executing tcp override dynamic setting
+16:24:14 (daemon_c) No TCP override detected
+16:24:14 (daemon_c) SLOG: Summary LOG statistics is enabled.
+16:24:14 (daemon_c) SLOG: FNPLS-INTERNAL-CKPT1
+16:24:14 (daemon_c) SLOG: VM Status: 4
+16:24:14 (daemon_c) SLOG: FNPLS-INTERNAL-CKPT5
+16:24:14 (daemon_c) SLOG: TPM Status: 0
+16:24:14 (daemon_c) SLOG: FNPLS-INTERNAL-CKPT6
+16:24:14 (daemon_c) Using options file: ./daemon_c.opt
+16:24:14 (daemon_c) Server started on 10.10.10.101 for: LicFileVersion
+16:24:14 (daemon_c) Use Server Options 111        940
+16:24:14 (daemon_c) 945 Affirma sim analysis env Affirma_sim_analysis_env
+16:24:14 (daemon_c) COSLITE_ACCESS CelsiudC CelsiudC_G
+16:24:14 (daemon_c) C_1 C_2 C_3
+16:24:14 (daemon_c) E_1
+16:24:14 (daemon_c) E_2 G_1
+16:24:14 (daemon_c) G_2 I_1
+16:24:14_(daemon_c) I_2 I_3 I_4
+16:24:14_(daemon_c) V_A_1 V_B_2 V_C_3
+16:24:14_(daemon_c) X_A_1 X_B_2 X_C_3
+16:24:14 (daemon_c)
+16:24:14 (daemon_c) All FEATURE lines for daemon_c behave like INCREMENT Lines
+16:24:14 (daemon_c)
+16:24:14 (daemon_c) EXTERNAL FILTERS are OFF
+16:24:14 (daemon_c) ALL FEATURES: INACTIVITY TIMEOUT set to 3600 seconds
+16:24:14 (daemon_c) FEATURE V_B_2 INACTIVITY TIMEOUT set to 5400 seconds
+16:24:14 (daemon_c) FEATURE V_C_3 INACTIVITY TIMEOUT set to 7200 seconds
+16:24:14 (daemon_c) EXCLUDE HOST_GROUP logon_host from V_A_1
+16:24:14 (daemon_c) RESERVING 5 X_A_1/1A2B3C4D Licenses for USER_GROUP test_Group (daemon_c) EXCLUDE HOST_GROUP es_logon_host from Xcelium Single Core
+16:24:14 (lmgrd) daemon_c using TCP-port 34181
+16:24:14 (daemon_c) Changing message security level from -1 to 0
+16:24:14 (daemon_c) SLOG: Statistics Log Frequency is 240 minute(s).
+16:24:14 (daemon_c) SLOG: TS update poll interval is 600 seconds.
+16:24:14 (daemon_c) SLOG: Activation borrow reclaim percentage is 0.
+16:24:14 (daemon_c) (@daemon_c-SLOG@) ==================================================
+16:24:14 (daemon_c) (@daemon_c-SLOG@) === Vendor Daemon ===
+16:24:14 (daemon_c) (@daemon_c-SLOG@) Vendor daemon: daemon_c
+16:24:14 (daemon_c) (@daemon_c-SLOG@) Start-Date: Tue Jan 20 2026 16:24:14 PST
+16:24:14 (daemon_c) (@daemon_c-SLOG@) PID: 3365537
+16:24:14 (daemon_c) (@daemon_c-SLOG@) VD Version: v11.19.5.1 build 293554 x64_linux ( build 293554 (ipv6))
+16:24:14 (daemon_c) (@daemon_c-SLOG@) 
+16:24:14 (daemon_c) (@daemon_c-SLOG@) == Startup/Restart Info ==
+16:24:14 (daemon_c) (@daemon_c-SLOG@) Options file used: ./daemon_c.opt
+16:24:14 (daemon_c) (@daemon_c-SLOG@) Is vendor daemon a CVD: No
+16:24:14 (daemon_c) (@daemon_c-SLOG@) Is FlexNet Licensing Service installed and compatible: No
+16:24:14 (daemon_c) (@daemon_c-SLOG@) FlexNet Licensing Service Version: -NA-
+16:24:14 (daemon_c) (@daemon_c-SLOG@) Is TS accessed: No
+16:24:14 (daemon_c) (@daemon_c-SLOG@) TS access time: -NA-
+16:24:14 (daemon_c) (@daemon_c-SLOG@) Number of VD restarts since LS startup: 0
+16:24:14 (daemon_c) (@daemon_c-SLOG@) 
+16:24:14 (daemon_c) (@daemon_c-SLOG@) == Network Info ==
+16:24:14 (daemon_c) (@daemon_c-SLOG@) Listening port: 34181
+16:24:14 (daemon_c) (@daemon_c-SLOG@) Daemon select timeout (in seconds): 1
+16:24:14 (daemon_c) (@daemon_c-SLOG@) 
+16:24:14 (daemon_c) (@daemon_c-SLOG@) == Host Info ==
+16:24:14 (daemon_c) (@daemon_c-SLOG@) Host used in license file: 10.10.10.101
+16:24:14 (daemon_c) (@daemon_c-SLOG@) HostID's node-locked in 3Server license file: 352 856 467
+16:24:14 (daemon_c) (@daemon_c-SLOG@) HostID of the License Server: 352
+16:24:14 (daemon_c) (@daemon_c-SLOG@) Running on Hypervisor: Unknown Hypervisor
+16:24:14 (daemon_c) (@daemon_c-SLOG@) 
+16:24:14 (daemon_c) Ecocs: Encrypted Communication disabled
+16:24:14 (daemon_c) TCP_NODELAY NOT enabled
+16:24:14 (daemon_c) Listener Thread: running
+16:24:22 (daemon_c) OUT: "Q_1" ll@c_host1
+16:24:25 (daemon_c) OUT: "V_A_1" ll@c_host1
+16:24:33 (lmgrd) Attempting connection to tertiary redundant server 10.10.10.102
+16:24:33 (lmgrd) Failed to connect to tertiary redundant server 10.10.10.102
+16:24:33 (lmgrd) Connection attempt to tertiary redundant server 10.10.10.102 failed
+16:24:38 (daemon_c) OUT: "X_A_1" es@h_host1.abc.com [X A 1 Engine]
+16:24:38 (daemon_c) OUT: "X_A_1" es@h_host1.abc.com [X A 1 Engine]
+16:24:54 (lmgrd) Attempting connection to tertiary redundant server 10.10.10.102
+16:24:55 (lmgrd) Failed to connect to tertiary redundant server 10.10.10.102
+16:24:55 (lmgrd) Connection attempt to tertiary redundant server 10.10.10.102 failed
+16:25:02 (daemon_c) OUT: "V_A_3" fy@j_host2 [A Base] (2 licenses)
+16:25:03 (daemon_c) OUT: "V_A_3" fy@j_host2 [A M-core (Max. 4 cores)] (2 licenses)
+16:25:16 (lmgrd) Attempting connection to tertiary redundant server 10.10.10.102
+16:25:16 (lmgrd) Failed to connect to tertiary redundant server 10.10.10.102
+16:27:48 (daemon_c) OUT: "X_A_1" kk@h_host2 [X A Engine]
+16:27:51 (daemon_c) OUT: "111" fy@h_host2
+16:27:51 (daemon_c) OUT: "V_A_3" fy@h_host2
+16:28:03 (daemon_c) OUT: "X_A_1" wyw@t_host6 [X A Engine]
+16:28:07 (daemon_c) OUT: "Integrated_Metrics_Center" wyw@h_host3.abc.com [ABC3456789012]
+16:28:09 (daemon_c) IN: "X_A_1" es@h_host3.abc.com [X A Engine]
+16:28:09 (daemon_c) IN: "X_A_1" es@h_host3.abc.com [X A Engine]
+16:28:09 (lmgrd) Attempting connection to tertiary redundant server 10.10.10.102
+16:28:09 (lmgrd) Failed to connect to tertiary redundant server 10.10.10.102
+16:28:09 (lmgrd) Connection attempt to tertiary redundant server 10.10.10.102 failed
+16:28:13 (daemon_c) OUT: "Virtuoso_Multi_mode_Simulation" ra@e_host9.abc.com [AP Base] (2 licenses)
+16:28:16 (daemon_c) OUT: "X_A_1" gitlab-runner@h_host3.abc.com [X A Engine]
+16:28:16 (daemon_c) OUT: "X_B_2" gitlab-runner@h_host3.abc.com [X A Engine]
+16:28:16 (daemon_c) OUT: "S_1" ra-lnx19.abc.com (2 licenses)
+16:28:20 (daemon_c) OUT: "V_A_3" ra@e_host9.abc.com [AP Multi-core (Max. 16 cores)] (4 licenses)
+16:28:22 (daemon_c) OUT: "V_A_3" fy@h_host4.abc.com [AP Base] (2 licenses)
+16:28:24 (daemon_c) OUT: "S_1" ra@e_host9.abc.com [AP Multi-core (Max. 16 cores)] (4 licenses)
+16:28:29 (daemon_c) OUT: "X_A_1" ra@e_host9.abc.com [X A Engine]
+16:28:30 (lmgrd) Attempting connection to tertiary redundant server 10.10.10.102
+16:28:30 (lmgrd) Failed to connect to tertiary redundant server 10.10.10.102
+16:28:30 (lmgrd) Connection attempt to tertiary redundant server 10.10.10.102 failed
+16:28:31 (daemon_c) OUT: "V_A_3" ra@e_host9.abc.com [X A Engine]
+16:28:34 (daemon_c) OUT: "S_1" ra@e_host9.abc.com [X A Engine]
+16:28:36 (daemon_c) OUT: "X_B_2" ra@e_host9.abc.com [X A Engine]
+16:28:45 (daemon_c) OUT: "I_1" ww@h_host3.abc.com [ABC2345678901]
+16:28:48 (daemon_c) IN: "X_A_1" wyw@t_host6 [X A Engine]
+16:28:49 (daemon_c) IN: "X_A_1" wyw@t_host9 [X A Engine]
+16:28:50 (daemon_c) IN: "X_B_2" gitlab-runner@h_host3.abc.com [X A Engine]
+16:28:51 (lmgrd) Attempting connection to tertiary redundant server 10.10.10.102
+16:28:51 (lmgrd) Failed to connect to tertiary redundant server 10.10.10.102
+16:28:51 (lmgrd) Connection attempt to tertiary redundant server 10.10.10.102 failed
+16:28:51 (daemon_c) OUT: "I_1" lc@h_host3.abc.com [ABC1234567890]
+16:29:45 (daemon_c) OUT: "X_A_1" gitlab-runner@h_host3.abc.com [X A Engine]
+16:29:51 (lmgrd) Attempting connection to tertiary redundant server 10.10.10.102
+16:29:51 (lmgrd) Failed to connect to tertiary redundant server 10.10.10.102
+16:29:51 (lmgrd) Connection attempt to tertiary redundant server 10.10.10.102 failed
+16:28:51 (daemon_c) OUT: "I_1" lc@h_host3.abc.com [ABC1234567890]
+19:40:27 (daemon_c) DENIED: "T XL" ll@c_host1 
+19:40:28 (daemon_c) QUEUED: "G S" jz@c_host2
+19:49:18 (daemon_c) UNSUPPORTED: "X_A_1" (PORT AT HOST PLUS "X_A_1" (PORT_AT_HOST_PLUS) ns@e_host1.abc.com [X_A_1] (No such feature exists. (-5,346:104 Connection reset by peer"))) 
+19:49:20 (daemon_c) UNSUPPORTED: "V_C_3" (PORT AT HOST PLUS (No such feature exists.) ra@e_host6.abc.com "Connection reset by peer"))
+19:56:03 (daemon_c) DEQUEUED: "Genus_Synthesis" jz@c_host2

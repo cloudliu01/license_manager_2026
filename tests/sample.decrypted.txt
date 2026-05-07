@@ -1,0 +1,545 @@
+# tests/resources/lmstat_samples.py
+
+# Sample lmstat output for Virtuoso_Multi_mode_Simulation (real format based on actual FlexNet output)
+LMSTAT_OUTPUT_VIRTUOSO = """lmstat - Copyright (c) 1994-2024 Flexera. All rights reserved.
+Flexible License Manager status on Thu Jan 16 14:20:15 2026
+
+License file(s) on lic_server_1:
+  /path/to/license.dat:
+
+lic_server_1: license server UP (MASTER) v11.17
+
+Users of feature_1:  (Total of 3 licenses issued;  Total of 2 licenses in use)
+
+  Virtuoso_Multi_mode_Simulation: v6.18, vendor: c, expiry: 31-dec-2024
+    "liliu" host_21 /dev/pts/2 (v6.18) (lic_server_1/12345 56789), start Thu 1/16 14:00
+
+  Virtuoso_Multi_mode_Simulation: v6.18, vendor: c, expiry: 31-dec-2024
+    "user1" host_22 /dev/pts/1 (v6.18) (lic_server_1/12346 1234), start Thu 1/16 14:10
+
+Floating license
+"""
+
+# Sample lmstat output for Xcelium_Single_Core (real format based on actual FlexNet output)
+LMSTAT_OUTPUT_XCELIUM = """lmstat - Copyright (c) 1994-2024 Flexera. All rights reserved.
+Flexible License Manager status on Thu Jan 16 14:20:30 2026
+
+License file(s) on lic_server_1:
+  /path/to/license.dat:
+
+lic_server_1: license server UP (MASTER) v11.17
+
+Users of feature_2:  (Total of 5 licenses issued;  Total of 1 license in use)
+
+  Xcelium_Single_Core: v8.03, vendor: c, expiry: 31-dec-2024
+    "user2" host_23 /dev/pts/3 (v8.03) (lic_server_1/12347 5678), start Thu 1/16 14:15
+
+    floating license
+"""
+
+# Combined summary output with NOTE section
+LMSTAT_OUTPUT_SUMMARY = """lmstat - Copyright (c) 1994-2024 Flexera. All rights reserved.
+Flexible License Manager status on Thu Jan 16 14:20:45 2026
+
+License file(s) on lic_server_1:
+  /path/to/license.dat:
+
+lic_server_1: license server UP (MASTER) v11.17
+
+Users of feature_1:  (Total of 3 licenses issued;  Total of 2 licenses in use)
+
+  Virtuoso_Multi_mode_Simulation: v6.18, vendor: c, expiry: 31-dec-2024
+    "liliu" host_21 /dev/pts/2 (v6.18) (lic_server_1/12345 56789), start Thu 1/16 14:00
+
+  Virtuoso_Multi_mode_Simulation: v6.18, vendor: c, expiry: 31-dec-2024
+    "user1" host_22 /dev/pts/1 (v6.18) (lic_server_1/12346 1234), start Thu 1/16 14:10
+
+Users of feature_2:  (Total of 5 licenses issued;  Total of 1 license in use)
+
+  Xcelium_Single_Core: v8.03, vendor: c, expiry: 31-dec-2024
+    "user2" host_23 /dev/pts/3 (v8.03) (lic_server_1/12347 5678), start Thu 1/16 14:15
+
+    floating license
+ NOTE:
+Feature                      #licenses
+  ====================================
+  Virtuoso_Multi_mode_Simulation 3
+  Xcelium_Single_Core          5
+"""
+
+# Sample lmstat output with RESERVATIONs
+LMSTAT_OUTPUT_WITH_RESERVATIONS = """lmstat - Copyright (c) 1994-2024 Flexera. All rights reserved.
+Flexible License Manager status on Tue 5/5/2026 17:40
+
+License server status: 5280@lic_server_1,5280@lic_server_2
+    License file(s) on lic_server_1: /path/to/license.dat:
+
+lic_server_1: license server UP (MASTER) v11.19.5
+
+Vendor daemon status (on lic_server_1):
+
+    c2: UP v11.19.5
+Feature usage info:
+
+Users of feature_1:  (Total of 120 licenses issued;  Total of 66 licenses in use)
+
+  "feature_1" v25.1, vendor: c2, expiry: 21-aug-2026
+  vendor_string: J:LicFileVersion:PERM
+  floating license
+
+jp host_24 :21 info_1 (v23.100) (lic_server_1/5280 11501), start Tue 4/28 10:30, 2 licenses
+	40 RESERVATIONs for GROUP group_1 (lic_server_1/5280)
+
+Users of feature_2:  (Total of 100 licenses issued;  Total of 0 licenses in use)
+
+  feature_2 v8.03, vendor: c2, expiry: 21-aug-2026
+  floating license
+
+	25 RESERVATIONs for GROUP group_2 (lic_server_2/5280)
+"""
+
+# Real full lmstat -c 5280@lic_server_1 -a -i output
+LMSTAT_OUTPUT_FULL_REAL = """linux26-x86_64
+execute cmd : /path/to/license.09.sp2.hf2_linux-x86_64_rh6_20260322/tools/flexlm/platform/linux26-x86_64/bin/lmstat
+lmstat - Copyright (c) 1989-2015 Flexera Software LLC. All Rights Reserved.
+Flexible License Manager status on Wed 5/6/2026 19:01
+
+License server status: 5280@lic_server_1,5280@lic_server_2,5280@lic_server_3
+    License file(s) on lic_server_1: /path/to/license.dat:
+
+lic_server_1: license server UP (MASTER) v11.19.5
+lic_server_2: license server UP v11.19.5
+lic_server_3: license server UP v11.19.5
+
+Vendor daemon status (on lic_server_1):
+
+    c2: UP v11.19.5
+Feature usage info:
+
+Users of feature_3:  (Total of 1 license issued;  Total of 0 licenses in use)
+
+Users of feature_4:  (Total of 1 license issued;  Total of 0 licenses in use)
+
+Users of feature_5:  (Total of 31 licenses issued;  Total of 14 licenses in use)
+
+  "feature_5" v25.1, vendor: c2, expiry: 01-nov-2026
+  floating license
+
+yl host_1 :29 (v6.180) (lic_server_1/5280 1645), start Wed 5/6 13:43
+pw host_2 :4 (v6.180) (lic_server_1/5280 644), start Wed 5/6 16:07
+lw host_3 :36 (v6.180) (lic_server_1/5280 20909), start Wed 5/6 16:19
+bg host_2 :3 (v6.180) (lic_server_1/5280 19932), start Wed 5/6 16:54
+mb host_25 :4 (v6.180) (lic_server_1/5280 9562), start Wed 5/6 17:13
+bc host_2 :6 (v6.180) (lic_server_1/5280 433), start Wed 5/6 17:58
+kk host_4 :28 (v6.180) (lic_server_1/5280 2812), start Wed 5/6 17:42
+ar host_26 host_27:12.0 (v6.180) (lic_server_1/5280 9493), start Wed 5/6 18:01
+yz host_25 :14 (v6.180) (lic_server_1/5280 4822), start Wed 5/6 18:02
+om host_26 :5 (v6.180) (lic_server_1/5280 5549), start Wed 5/6 18:14
+om2 host_1 :28.0 (v6.180) (lic_server_1/5280 920), start Wed 5/6 18:34
+jd host_5 :62 (v6.180) (lic_server_1/5280 8237), start Wed 5/6 18:42
+jz host_2 :11 (v6.180) (lic_server_1/5280 18168), start Wed 5/6 18:43
+jm host_6 :33 (v6.180) (lic_server_1/5280 2004), start Wed 5/6 18:44
+
+Users of feature_6:  (Total of 14 licenses issued;  Total of 0 licenses in use)
+
+Users of feature_7:  (Total of 14 licenses issued;  Total of 0 licenses in use)
+
+Users of feature_8:  (Total of 87 licenses issued;  Total of 54 licenses in use)
+
+  "feature_8" v25.1, vendor: c2, expiry: 01-nov-2026
+  floating license
+
+pc host_28 :7 (v16.000) (lic_server_1/5280 8401), start Tue 4/28 10:29
+eb host_7 :10 (v16.000) (lic_server_1/5280 19210), start Thu 4/30 16:19
+yp host_29 :1 (v16.000) (lic_server_1/5280 8901), start Tue 4/28 10:29
+hw host_30 :28 (v16.000) (lic_server_1/5280 14601), start Tue 4/28 10:32
+ms host_7 :9 (v16.000) (lic_server_1/5280 10001), start Tue 4/28 10:30
+az host_31 :20 (v16.000) (lic_server_1/5280 10401), start Tue 4/28 10:30
+hh host_32 :5 (v16.000) (lic_server_1/5280 10801), start Tue 4/28 10:30
+ma cn02 :10 (v16.000) (lic_server_1/5280 12901), start Tue 4/28 10:31
+nt host_3 :57 (v16.000) (lic_server_1/5280 13301), start Tue 4/28 10:31
+zx host_33 :98 (v16.000) (lic_server_1/5280 13501), start Tue 4/28 10:31
+jl host_33 :45 (v16.000) (lic_server_1/5280 14301), start Tue 4/28 10:32
+kz host_32 :54 (v16.000) (lic_server_1/5280 14501), start Tue 4/28 10:32
+pp host_8 :13 (v16.000) (lic_server_1/5280 14801), start Tue 4/28 10:32
+aa host_7 :16 (v16.000) (lic_server_1/5280 15701), start Tue 4/28 10:32
+jp2 host_8 :30 (v16.000) (lic_server_1/5280 15648), start Wed 4/29 17:53
+    rolu host_9 :24 (v16.000) (lic_server_1/5280 13226), start Thu 4/30 5:33
+jj host_30 :8 (v16.000) (lic_server_1/5280 14434), start Thu 4/30 7:46
+ra host_10 :3 (v16.000) (lic_server_1/5280 20821), start Tue 5/5 9:44
+jw host_29 :2 (v16.000) (lic_server_1/5280 8361), start Wed 5/6 2:55
+gy host_34 :6 (v16.000) (lic_server_1/5280 2467), start Wed 5/6 3:37
+qw host_34 :79 (v16.000) (lic_server_1/5280 8002), start Wed 5/6 4:00
+nw host_28 :9 (v16.000) (lic_server_1/5280 20569), start Wed 5/6 5:21
+lz host_28 :13 (v16.000) (lic_server_1/5280 6150), start Wed 5/6 5:33
+zj host_35 :9 (v16.000) (lic_server_1/5280 773), start Wed 5/6 6:04
+    yang.zhang1 host_36 :8 (v16.000) (lic_server_1/5280 21263), start Wed 5/6 7:46
+jp2 host_11 :12 (v16.000) (lic_server_1/5280 15408), start Wed 5/6 8:06
+zx host_36 :2 (v16.000) (lic_server_1/5280 12097), start Wed 5/6 8:14
+yl host_1 :29 (v16.000) (lic_server_1/5280 20470), start Wed 5/6 9:58
+mg host_1 :41 (v16.000) (lic_server_1/5280 17060), start Wed 5/6 15:20
+gg host_12 :11 (v16.000) (lic_server_1/5280 11622), start Wed 5/6 16:16
+fb host_1 :27 (v16.000) (lic_server_1/5280 17312), start Wed 5/6 16:40
+ra host_1 :34.0 (v16.000) (lic_server_1/5280 15056), start Wed 5/6 17:11
+to host_9 host_27:50.0 (v16.000) (lic_server_1/5280 5923), start Wed 5/6 17:52
+lg host_3 :37 (v16.000) (lic_server_1/5280 15587), start Wed 5/6 18:30
+lr host_13 :24 (v16.000) (lic_server_1/5280 18661), start Wed 5/6 18:30
+om2 host_1 :28.0 (v16.000) (lic_server_1/5280 21196), start Wed 5/6 18:30
+ty host_14 :43 (v16.000) (lic_server_1/5280 16307), start Wed 5/6 18:30
+ms2 host_31 :12 (v16.000) (lic_server_1/5280 205), start Wed 5/6 18:30
+eb host_9 :29 (v16.000) (lic_server_1/5280 4902), start Wed 5/6 18:30
+bj host_37 :6 (v16.000) (lic_server_1/5280 4602), start Wed 5/6 18:30
+ll host_28 :14 (v16.000) (lic_server_1/5280 3704), start Wed 5/6 18:30
+cs host_8 :2 (v16.000) (lic_server_1/5280 2122), start Wed 5/6 18:30
+zz host_38 :77 (v16.000) (lic_server_1/5280 4002), start Wed 5/6 18:31
+aa host_8 :34 (v16.000) (lic_server_1/5280 7283), start Wed 5/6 18:31
+hh host_36 host_32:5 (v16.000) (lic_server_1/5280 18576), start Wed 5/6 18:31
+hw2 host_39 :3 (v16.000) (lic_server_1/5280 11712), start Wed 5/6 18:31
+nf host_1 :37.0 (v16.000) (lic_server_1/5280 13954), start Wed 5/6 18:32
+es host_4 :16 (v16.000) (lic_server_1/5280 7605), start Wed 5/6 18:32
+ch host_8 :36 (v16.000) (lic_server_1/5280 16544), start Wed 5/6 18:32
+tp host_9 :3 (v16.000) (lic_server_1/5280 7730), start Wed 5/6 18:32
+tl host_40 host_41:17 (v16.000) (lic_server_1/5280 11259), start Wed 5/6 18:33
+pm host_11 :22 (v16.000) (lic_server_1/5280 3671), start Wed 5/6 18:33
+od host_28 :2 (v16.000) (lic_server_1/5280 11040), start Wed 5/6 18:34
+ms host_14 :1 (v16.000) (lic_server_1/5280 19174), start Wed 5/6 18:35
+
+Users of feature_9:  (Total of 1 license issued;  Total of 0 licenses in use)
+
+Users of feature_10:  (Total of 1 license issued;  Total of 0 licenses in use)
+
+Users of feature_11:  (Total of 1 license issued;  Total of 0 licenses in use)
+
+Users of feature_12:  (Total of 1 license issued;  Total of 0 licenses in use)
+
+Users of feature_13:  (Total of 1 license issued;  Total of 0 licenses in use)
+
+Users of feature_14:  (Total of 1 license issued;  Total of 0 licenses in use)
+
+Users of feature_15:  (Total of 1 license issued;  Total of 0 licenses in use)
+
+Users of feature_16:  (Total of 3 licenses issued;  Total of 0 licenses in use)
+
+Users of feature_17:  (Total of 14 licenses issued;  Total of 0 licenses in use)
+
+Users of feature_18:  (Total of 3 licenses issued;  Total of 0 licenses in use)
+
+Users of feature_19:  (Total of 3 licenses issued;  Total of 0 licenses in use)
+
+Users of feature_20:  (Total of 1 license issued;  Total of 0 licenses in use)
+
+Users of feature_21:  (Total of 2 licenses issued;  Total of 2 licenses in use)
+
+  "feature_21" v25.1, vendor: c2, expiry: 01-nov-2026
+  floating license
+
+gi host_39 host_39:9 (v23.100) (lic_server_1/5280 15156), start Wed 5/6 16:38
+rc host_42 host_15:42 (v23.100) (lic_server_1/5280 5792), start Wed 5/6 18:49
+nv host_8 :32 (v23.100) (lic_server_1/5280 6519) queued for 1 license
+
+Users of feature_22:  (Total of 2 licenses issued;  Total of 1 license in use)
+
+  "feature_22" v25.1, vendor: c2, expiry: 01-nov-2026
+  floating license
+
+mc host_43 host_43:3 (v22.100) (lic_server_1/5280 17597), start Wed 5/6 18:10
+
+Users of feature_23:  (Total of 7 licenses issued;  Total of 0 licenses in use)
+
+Users of feature_24:  (Total of 2 licenses issued;  Total of 1 license in use)
+
+  "feature_24" v25.1, vendor: c2, expiry: 01-nov-2026
+  floating license
+
+mc host_43 host_43:3 (v22.100) (lic_server_1/5280 8870), start Wed 5/6 18:08
+
+Users of feature_25:  (Total of 5 licenses issued;  Total of 1 license in use)
+
+  "feature_25" v25.1, vendor: c2, expiry: 01-nov-2026
+  floating license
+
+jf host_39 host_16:6 (v23.100) (lic_server_1/5280 10565), start Wed 5/6 17:02
+
+Users of feature_26:  (Total of 26 licenses issued;  Total of 8 licenses in use)
+
+  "feature_26" v26.0, vendor: c2, expiry: 01-nov-2026
+  floating license
+
+xl host_30 :60 info_A_7 (v21.0) (lic_server_1/5280 4766), start Wed 5/6 18:29
+wl host_30 :46 info_A_8 (v21.0) (lic_server_1/5280 7079), start Wed 5/6 18:29
+lc host_8 :12 info_A_9 (v23.0) (lic_server_1/5280 18824), start Wed 5/6 18:29
+lc host_8 :12 info_A_10 (v23.0) (lic_server_1/5280 17288), start Wed 5/6 18:31
+    willy_yuxiang.wang host_8 :21 info_A_11 (v23.0) (lic_server_1/5280 7544), start Wed 5/6 18:32
+es host_4 :16 info_A_12 (v23.0) (lic_server_1/5280 7318), start Wed 5/6 18:33
+lc host_44 :1 info_A_13 (v21.0) (lic_server_1/5280 12702), start Wed 5/6 18:38
+lc host_44 :1 info_A_14 (v21.0) (lic_server_1/5280 10181), start Wed 5/6 18:38
+
+Users of feature_27:  (Total of 6 licenses issued;  Total of 0 licenses in use)
+
+Users of feature_28:  (Total of 6 licenses issued;  Total of 0 licenses in use)
+
+Users of feature_29:  (Total of 13 licenses issued;  Total of 0 licenses in use)
+
+Users of feature_30:  (Total of 1 license issued;  Total of 0 licenses in use)
+
+Users of feature_31:  (Total of 1 license issued;  Total of 0 licenses in use)
+
+Users of feature_32:  (Total of 1 license issued;  Total of 1 license in use)
+
+  "feature_32" v2025.1, vendor: c2, expiry: 02-aug-2026
+  floating license
+
+me host_45 0:0 (v2025.100) (lic_server_1/5280 3430), start Wed 5/6 18:17
+
+Users of feature_33:  (Total of 1 license issued;  Total of 0 licenses in use)
+
+Users of feature_34:  (Total of 2 licenses issued;  Total of 0 licenses in use)
+
+Users of feature_35:  (Total of 120 licenses issued;  Total of 9 licenses in use)
+
+  "feature_35" v25.1, vendor: c2, expiry: 01-nov-2026
+  floating license
+
+om2 host_46 host_1:28.0 info_X_4 (v23.100) (lic_server_1/5280 7834), start Wed 5/6 18:05
+om2 host_46 host_1:28.0 (v23.100) (lic_server_1/5280 19721), start Wed 5/6 18:05, 2 licenses
+om2 host_46 host_1:28.0 (v23.100) (lic_server_1/5280 20686), start Wed 5/6 18:07, 6 licenses
+
+Users of feature_36:  (Total of 120 licenses issued;  Total of 0 licenses in use)
+
+Users of feature_37:  (Total of 1 license issued;  Total of 0 licenses in use)
+
+Users of feature_38:  (Total of 2 licenses issued;  Total of 2 licenses in use)
+
+  "feature_38" v25.1, vendor: c2, expiry: 01-nov-2026
+  floating license
+
+jf host_39 host_16:6 (v23.100) (lic_server_1/5280 8580), start Wed 5/6 17:03
+lr2 host_39 host_16:6 (v22.100) (lic_server_1/5280 20727), start Wed 5/6 18:43
+
+Users of feature_39:  (Total of 1 license issued;  Total of 0 licenses in use)
+
+Users of feature_40:  (Total of 1 license issued;  Total of 0 licenses in use)
+
+Users of feature_41:  (Total of 1 license issued;  Total of 0 licenses in use)
+
+Users of feature_42:  (Total of 10 licenses issued;  Total of 9 licenses in use)
+
+  "feature_42" v25.1, vendor: c2, expiry: 01-nov-2026
+  floating license
+
+ah host_11 :11.0 (v6.180) (lic_server_1/5280 5422), start Wed 5/6 8:09
+hl host_35 :8.0 (v6.180) (lic_server_1/5280 18963), start Wed 5/6 15:43
+pw host_2 :4 (v6.180) (lic_server_1/5280 8165), start Wed 5/6 16:07
+bg host_2 :3 (v6.180) (lic_server_1/5280 13809), start Wed 5/6 16:54
+kk host_4 :28 (v6.180) (lic_server_1/5280 20075), start Wed 5/6 17:42
+ar host_26 host_27:12.0 (v6.180) (lic_server_1/5280 15935), start Wed 5/6 18:01
+yz host_25 :14 (v6.180) (lic_server_1/5280 3567), start Wed 5/6 18:02
+jz host_2 :11 (v6.180) (lic_server_1/5280 9195), start Wed 5/6 18:43
+jm host_6 :33 (v6.180) (lic_server_1/5280 12360), start Wed 5/6 18:47
+
+Users of feature_43:  (Total of 3 licenses issued;  Total of 0 licenses in use)
+
+Users of feature_44:  (Total of 120 licenses issued;  Total of 0 licenses in use)
+
+Users of feature_45:  (Total of 17 licenses issued;  Total of 0 licenses in use)
+
+Users of feature_46:  (Total of 4 licenses issued;  Total of 1 license in use)
+
+  "feature_46" v25.1, vendor: c2, expiry: 01-nov-2026
+  floating license
+
+lr2 host_39 host_16:6 (v23.100) (lic_server_1/5280 12803), start Wed 5/6 18:43
+
+Users of feature_47:  (Total of 3 licenses issued;  Total of 3 licenses in use)
+
+  "feature_47" v25.1, vendor: c2, expiry: 01-nov-2026
+  floating license
+
+bc host_2 :6 (v6.180) (lic_server_1/5280 10705), start Wed 5/6 18:21
+om host_26 :5 (v6.180) (lic_server_1/5280 20376), start Wed 5/6 18:24
+jz host_2 :11 (v6.180) (lic_server_1/5280 16004), start Wed 5/6 18:43
+
+Users of feature_1:  (Total of 120 licenses issued;  Total of 61 licenses in use)
+
+  "feature_1" v25.1, vendor: c2, expiry: 01-nov-2026
+  floating license
+
+fy sj-ws-lnx12 :2 info_5 (v20.100) (lic_server_1/5280 9637), start Mon 5/4 20:22, 2 licenses
+fy sj-ws-lnx12 :2 info_6 (v20.100) (lic_server_1/5280 19387), start Mon 5/4 20:22, 4 licenses
+fy sj-ws-lnx17 :1 info_5 (v20.100) (lic_server_1/5280 19414), start Mon 5/4 21:17, 2 licenses
+fy sj-ws-lnx17 :1 info_6 (v20.100) (lic_server_1/5280 9948), start Mon 5/4 21:17, 4 licenses
+om2 host_46 host_1:28.0 info_X_4 (v23.100) (lic_server_1/5280 3838), start Wed 5/6 18:04
+om2 host_46 host_1:28.0 info_2 (v23.100) (lic_server_1/5280 571), start Wed 5/6 18:05, 2 licenses
+om2 host_46 host_1:28.0 info_3 (v23.100) (lic_server_1/5280 19637), start Wed 5/6 18:07, 6 licenses
+	40 RESERVATIONs for GROUP group_1 (lic_server_1/5280)
+
+Users of feature_48:  (Total of 1 license issued;  Total of 0 licenses in use)
+
+Users of feature_49:  (Total of 12 licenses issued;  Total of 7 licenses in use)
+
+  "feature_49" v25.1, vendor: c2, expiry: 01-nov-2026
+  floating license
+
+hl host_35 :8.0 (v6.180) (lic_server_1/5280 3097), start Wed 5/6 15:43
+pw host_2 :4 (v6.180) (lic_server_1/5280 15293), start Wed 5/6 16:07
+yz host_25 :14 (v6.180) (lic_server_1/5280 13756), start Wed 5/6 18:02
+rr host_25 :8.0 (v6.100) (lic_server_1/5280 17940), start Wed 5/6 18:16
+ar host_26 host_27:12.0 (v6.180) (lic_server_1/5280 8766), start Wed 5/6 18:30
+kk host_4 :28 (v6.180) (lic_server_1/5280 1028), start Wed 5/6 19:00
+om host_26 :5 (v6.180) (lic_server_1/5280 2795), start Wed 5/6 19:01
+
+Users of feature_50:  (Total of 2 licenses issued;  Total of 2 licenses in use)
+
+  "feature_50" v25.1, vendor: c2, expiry: 01-nov-2026
+  floating license
+
+mb host_25 :4 (v6.180) (lic_server_1/5280 17446), start Wed 5/6 17:13
+bc host_2 :6 (v6.180) (lic_server_1/5280 18017), start Wed 5/6 18:19
+jz host_2 :11 (v6.180) (lic_server_1/5280 10384) queued for 1 license
+
+Users of feature_51:  (Total of 120 licenses issued;  Total of 0 licenses in use)
+
+Users of feature_52:  (Total of 1 license issued;  Total of 0 licenses in use)
+
+Users of feature_53:  (Total of 120 licenses issued;  Total of 0 licenses in use)
+
+Users of feature_54:  (Total of 1 license issued;  Total of 0 licenses in use)
+
+Users of feature_55:  (Total of 1 license issued;  Total of 0 licenses in use)
+
+Users of feature_56:  (Total of 13 licenses issued;  Total of 3 licenses in use)
+
+  "feature_56" v26.0, vendor: c2, expiry: 01-nov-2026
+  floating license
+
+om2 host_46 host_1:28.0 info_X_4 (v23.000) (lic_server_1/5280 869), start Wed 5/6 18:29
+jp2 host_47 host_48:0 info_X_4 (v20.000) (lic_server_1/5280 16981), start Wed 5/6 18:31
+ch host_42 host_8:36 info_X_4 (v20.000) (lic_server_1/5280 10636), start Wed 5/6 19:00
+
+Users of feature_2:  (Total of 26 licenses issued;  Total of 21 licenses in use)
+
+  "feature_2" v26.0, vendor: c2, expiry: 01-nov-2026
+  floating license
+
+pt host_17 host_1:31 info_X_4 (v20.000) (lic_server_1/5280 16817), start Wed 5/6 18:24
+om2 host_46 host_1:28.0 info_X_4 (v23.000) (lic_server_1/5280 2692), start Wed 5/6 18:29
+da host_43 host_43X info_X_4 (v23.000) (lic_server_1/5280 21002), start Wed 5/6 18:29
+zl host_49 host_50:12 info_X_4 (v20.000) (lic_server_1/5280 3303), start Wed 5/6 18:29
+jp2 host_47 host_48:0 info_X_4 (v20.000) (lic_server_1/5280 12206), start Wed 5/6 18:31
+ra host_8 host_48:0 info_X_4 (v23.000) (lic_server_1/5280 4159), start Wed 5/6 18:31
+yl2 host_51 host_52:8 info_X_4 (v20.000) (lic_server_1/5280 1922), start Wed 5/6 18:31
+ex host_53 :1 info_X_4 (v20.000) (lic_server_1/5280 5345), start Wed 5/6 18:31
+lg host_42 host_3:37 info_X_4 (v20.000) (lic_server_1/5280 7902), start Wed 5/6 18:32
+pt host_18 host_1:31 info_X_4 (v20.000) (lic_server_1/5280 6802), start Wed 5/6 18:32
+yd host_54 host_52:2 info_X_4 (v20.000) (lic_server_1/5280 14902), start Wed 5/6 18:32
+ra host_55 host_1:34.0 info_X_4 (v23.000) (lic_server_1/5280 11402), start Wed 5/6 18:32
+zw host_56 host_54:39 info_X_4 (v20.000) (lic_server_1/5280 6602), start Wed 5/6 18:33
+yl2 host_57 host_52:8 info_X_4 (v20.000) (lic_server_1/5280 340), start Wed 5/6 18:33
+pt host_19 host_1:31 info_X_4 (v20.000) (lic_server_1/5280 7442), start Wed 5/6 18:51
+ch host_42 host_8:36 info_X_4 (v20.000) (lic_server_1/5280 12509), start Wed 5/6 19:00
+lc host_20 :12 info_X_4 (v20.000) (lic_server_1/5280 16745), start Wed 5/6 19:00
+lc host_20 :12 info_X_4 (v20.000) (lic_server_1/5280 16140), start Wed 5/6 19:00
+	3 RESERVATIONs for GROUP group_1 (lic_server_1/5280)
+
+Users of feature_57:  (Total of 1 license issued;  Total of 1 license in use)
+
+  "feature_57" v26.0, vendor: c2, expiry: 01-nov-2026
+  floating license
+
+lc host_20 :12 info_A_15 (v23.0) (lic_server_1/5280 11856), start Wed 5/6 19:01
+
+Users of feature_58:  (Total of 1 license issued;  Total of 0 licenses in use)
+
+   v: UP v11.19.5
+Feature usage info:
+
+Users of feature_59:  (Total of 1 license issued;  Total of 0 licenses in use)
+
+Users of feature_60:  (Total of 1 license issued;  Total of 0 licenses in use)
+
+Users of feature_61:  (Total of 1 license issued;  Total of 0 licenses in use)
+
+Users of feature_62:  (Total of 1 license issued;  Total of 0 licenses in use)
+
+Users of feature_63:  (Total of 1 license issued;  Total of 0 licenses in use)
+
+Users of feature_64:  (Total of 1 license issued;  Total of 0 licenses in use)
+
+
+NOTE: lmstat -i does not give information from the server,
+      but only reads the license file.  For this reason, 
+      lmstat -a is recommended instead.
+
+Feature                         Version     #licenses    Expires      Vendor
+_______                         _________   _________    __________   ______
+feature_3                       2012.0         1              1-jan-0        c2
+feature_4                       1.0            1              1-jan-0        c2
+feature_5                       25.1           31             01-nov-2026    c2
+feature_6                       25.1           14             01-nov-2026    c2
+feature_7                       25.1           14             01-nov-2026    c2
+feature_8                       26.0           21             01-nov-2026    c2
+feature_8                       26.0           5              04-aug-2026    c2
+feature_8                       25.1           61             01-nov-2026    c2
+feature_9                       1.0            1              01-nov-2026    c2
+feature_10                      2025.1         1              02-aug-2026    c2
+feature_11                      2025.1         1              02-aug-2026    c2
+feature_12                      25.2           1              01-nov-2026    c2
+feature_13                      25.2           1              01-nov-2026    c2
+feature_14                      25.2           1              01-nov-2026    c2
+feature_15                      25.2           1              01-nov-2026    c2
+feature_16                      25.1           3              01-nov-2026    c2
+feature_17                      25.1           14             01-nov-2026    c2
+feature_18                      25.1           3              01-nov-2026    c2
+feature_19                      25.1           3              01-nov-2026    c2
+feature_20                      25.1           1              01-nov-2026    c2
+feature_21                      25.1           2              01-nov-2026    c2
+feature_22                      25.1           2              01-nov-2026    c2
+feature_23                      25.1           7              01-nov-2026    c2
+feature_24                      25.1           2              01-nov-2026    c2
+feature_25                      25.1           5              01-nov-2026    c2
+feature_26                      26.0           21             01-nov-2026    c2
+feature_26                      26.0           5              04-aug-2026    c2
+feature_27                      11.3           6              22-jun-2026    c2
+feature_28                      11.3           6              22-jun-2026    c2
+feature_29                      25.1           13             01-nov-2026    c2
+feature_30                      25.1           1              01-nov-2026    c2
+feature_31                      25.1           1              01-nov-2026    c2
+feature_32                      2025.1         1              02-aug-2026    c2
+feature_33                      2025.1         1              02-aug-2026    c2
+feature_34                      2025.1         2              02-aug-2026    c2
+feature_35                      25.1           120            01-nov-2026    c2
+feature_36                      25.1           120            01-nov-2026    c2
+feature_37                      25.1           1              01-nov-2026    c2
+feature_38                      25.1           1              01-nov-2026    c2
+feature_38                      25.1           1              13-jul-2026    c2
+feature_39                      25.1           1              01-nov-2026    c2
+feature_40                      25.1           1              01-nov-2026    c2
+feature_41                      25.1           1              01-nov-2026    c2
+feature_42                      25.1           10             01-nov-2026    c2
+feature_43                      25.1           3              01-nov-2026    c2
+feature_44                      25.1           120            01-nov-2026    c2
+feature_45                      25.1           17             01-nov-2026    c2
+feature_46                      25.1           4              01-nov-2026    c2
+feature_47                      25.1           3              01-nov-2026    c2
+feature_1                       25.1           120            01-nov-2026    c2
+feature_48                      25.1           1              01-nov-2026    c2
+feature_49                      25.1           12             01-nov-2026    c2
+feature_50                      25.1           2              01-nov-2026    c2
+feature_51                      25.1           120            01-nov-2026    c2
+feature_52                      25.1           1              01-nov-2026    c2
+feature_53                      25.1           120            01-nov-2026    c2
+feature_54                      25.1           1              01-nov-2026    c2
+feature_55                      25.1           1              01-nov-2026    c2
+feature_56                      26.0           8              01-nov-2026    c2
+feature_56                      26.0           5              04-aug-2026    c2
+feature_2                       26.0           21             01-nov-2026    c2
+feature_2                       26.0           5              04-aug-2026    c2
+feature_57                      26.0           1              01-nov-2026    c2
+feature_58                      26.0           1              01-nov-2026    c2
+feature_59                      25.2           1              01-nov-2026    v
+feature_60                      25.2           1              01-nov-2026    v
+feature_61                      25.2           1              01-nov-2026    v
+feature_62                      25.2           1              01-nov-2026    v
+feature_63                      25.2           1              01-nov-2026    v
+feature_64                      25.2           1              01-nov-2026    v
+"""

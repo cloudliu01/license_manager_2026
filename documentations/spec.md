@@ -1,6 +1,37 @@
-# License Manager Technical Specification (v1.7)
+# License Manager Technical Specification (v1.8)
 
-## 1. System Overview
+## 1. Background and Intention
+
+### 1.1 Background
+
+Many IT teams manage FlexLM-style licenses using vendor tools (lmgrd, lmstat) and ad-hoc scripts. This creates recurring operational problems:
+
+*   **Fragmented visibility**: license usage and health are scattered across hosts and log files.
+*   **Manual, error-prone operations**: start/stop/reread/license updates are executed inconsistently, often via SSH.
+*   **Weak auditability**: it is difficult to answer “who changed what, when, and why” after incidents.
+*   **Hard-to-scale governance**: as the number of license servers and sites grows, operational consistency degrades.
+*   **Offline/local constraints**: license hosts may be in restricted networks; local IT still needs to operate when the central server is unavailable.
+*   **Messy data**: lmstat output and license logs are semi-structured, vary by vendor/options, and are not designed for analytics.
+
+### 1.2 Intention
+
+This project builds a server–client license manager to provide a consistent operational layer around vendor licensing, with the following intentions:
+
+*   **Centralized observability**: Provide a fleet-level view of license availability, usage, expiry risk, and service health across all managed license endpoints (port@server).
+*   **Safe, consistent operations**: Standardize common actions (start/stop/restart/reread/apply config and license artifacts) behind explicit workflows, with idempotency and clear failure reporting.
+*   **Client independence with synchronization**: Each client must remain operable locally (with its own GUI) even when the server is offline, while ensuring changes are durably journaled and later synchronized to the server.
+*   **Structured data for analysis**: Ingest lmstat samples and relevant operational telemetry into a structured database (TimescaleDB) to enable time-series analysis, reporting, and long-term capacity planning.
+*   **Deterministic testing via simulators**: Provide lmgrd-sim and lmstat-sim to support deterministic development, integration testing, and reproducible incident/debug scenarios.
+
+### 1.3 Scope Boundaries
+
+The system:
+
+*   orchestrates vendor tooling; it does not replace vendor enforcement logic.
+*   does not require remote shell access or direct filesystem browsing across hosts.
+*   treats the server as the central auditor/aggregator, while client effective configuration remains authoritative on each client (to preserve offline capability).
+
+## 2. System Overview
 
 The system is a distributed license operations control plane for FlexLM-style environments, deployed in **server–client mode**:
 
@@ -16,9 +47,9 @@ The system is a distributed license operations control plane for FlexLM-style en
 
 ---
 
-## 2. Architecture
+## 3. Architecture
 
-### 2.1 Topology
+### 3.1 Topology
 
 ```mermaid
 flowchart LR
@@ -49,7 +80,7 @@ flowchart LR
   CORE -->|Control Commands| AGENT
 ```
 
-### 2.2 Authority Model
+### 3.2 Authority Model
 
 * **Client-authoritative config**: client effective config is authoritative; server stores snapshots and history.
 * **One active server per client**: bound by `(server_id, server_addr)`.
@@ -57,9 +88,9 @@ flowchart LR
 
 ---
 
-## 3. Components
+## 4. Components
 
-## 3.1 Server Core (Headless)
+## 4.1 Server Core (Headless)
 
 Responsibilities:
 
@@ -83,7 +114,7 @@ Constraints:
 
 ---
 
-## 3.2 Server GUI (Admin GUI)
+## 4.2 Server GUI (Admin GUI)
 
 Responsibilities:
 
@@ -103,7 +134,7 @@ Constraints:
 
 ---
 
-## 3.3 Client Agent (agentd)
+## 4.3 Client Agent (agentd)
 
 Responsibilities:
 
@@ -127,7 +158,7 @@ Responsibilities:
 
 ---
 
-## 3.4 Client GUI (Local GUI)
+## 4.4 Client GUI (Local GUI)
 
 Responsibilities:
 
@@ -143,7 +174,7 @@ Responsibilities:
 
 ---
 
-## 3.5 Database (TimescaleDB)
+## 4.5 Database (TimescaleDB)
 
 Default: external TimescaleDB
 Optional: embedded DB (explicitly enabled; single-node; non-HA)
@@ -157,11 +188,11 @@ Used for:
 
 ---
 
-## 3.6 Simulators
+## 4.6 Simulators
 
 Simulators are mandatory for deterministic testing and development. They are **not** a mock; they are executable substitutes for vendor tooling with stable outputs.
 
-### 3.6.1 lmgrd Simulator (`lmgrd-sim`)
+### 4.6.1 lmgrd Simulator (`lmgrd-sim`)
 
 #### Purpose
 
@@ -241,7 +272,7 @@ Agent tests and lmstat-sim must rely on this grammar.
 
 ---
 
-### 3.6.2 lmstat Simulator (`lmstat-sim`)
+### 4.6.2 lmstat Simulator (`lmstat-sim`)
 
 #### Purpose
 
@@ -290,9 +321,9 @@ Output must be identical except for explicitly marked timestamp fields (which ca
 
 ---
 
-## 4. Configuration Model (Client-Authoritative)
+## 5. Configuration Model (Client-Authoritative)
 
-### 4.1 Client Effective Config
+### 5.1 Client Effective Config
 
 Client agent maintains:
 
@@ -312,7 +343,7 @@ Server stores **snapshots** only:
 
 ---
 
-## 5. Single Active Server Binding
+## 6. Single Active Server Binding
 
 * Agent accepts commands only from the bound `server_id`.
 * Rebinding requires explicit local operator action (or a secured rebind procedure).
@@ -320,7 +351,7 @@ Server stores **snapshots** only:
 
 ---
 
-## 6. Protocol Compatibility
+## 7. Protocol Compatibility
 
 * Use protocol-version negotiation:
 
@@ -330,9 +361,9 @@ Server stores **snapshots** only:
 
 ---
 
-## 7. Sync, Revisions, and Editing
+## 8. Sync, Revisions, and Editing
 
-### 7.1 Sync States
+### 8.1 Sync States
 
 ```mermaid
 stateDiagram-v2
@@ -344,13 +375,13 @@ stateDiagram-v2
   STALE --> IN_SYNC: reconnect + new snapshot
 ```
 
-### 7.2 Server GUI Edit Lease (Concurrency control)
+### 8.2 Server GUI Edit Lease (Concurrency control)
 
 * server issues per-client `lease_id` with TTL
 * at most one active lease per client
 * required for server-initiated config proposals
 
-### 7.3 Idempotent Change Requests
+### 8.3 Idempotent Change Requests
 
 Every change request includes:
 
@@ -372,7 +403,7 @@ If apply succeeds:
 
 ---
 
-## 8. Offline Local Operations
+## 9. Offline Local Operations
 
 * Client GUI operates through agent even when server offline
 * All local operations are journaled durably (SQLite recommended)
@@ -380,9 +411,9 @@ If apply succeeds:
 
 ---
 
-## 9. Data Storage (TimescaleDB)
+## 10. Data Storage (TimescaleDB)
 
-### 9.1 Logical Tables
+### 10.1 Logical Tables
 
 Hypertables:
 
@@ -400,7 +431,7 @@ Tables:
 * `control_requests`
 * `control_results`
 
-### 9.2 Retention
+### 10.2 Retention
 
 * raw records retained N days (configurable)
 * time-series retained long-term (configurable)
@@ -410,7 +441,7 @@ Server runtime logs remain file-rotated (diagnostic only).
 
 ---
 
-## 10. Logging
+## 11. Logging
 
 Client:
 
@@ -425,7 +456,7 @@ Server:
 
 ---
 
-## 11. Control Actions
+## 12. Control Actions
 
 Supported actions (initiated by either GUI, executed by agent):
 
@@ -438,7 +469,7 @@ All control requests are idempotent.
 
 ---
 
-## 12. Testing Requirements
+## 13. Testing Requirements
 
 Mandatory:
 
@@ -455,7 +486,7 @@ Mandatory:
 
 ---
 
-## 13. Packaging & Portability
+## 14. Packaging & Portability
 
 * No installer
 * Unpack-and-run
@@ -481,7 +512,7 @@ flowchart TD
 
 ---
 
-## 14. Security (Baseline)
+## 15. Security (Baseline)
 
 * agent auth is separate from user auth
 * agent bound to `server_id`
