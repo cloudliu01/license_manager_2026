@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 
 
 def generate_output(
@@ -9,7 +9,7 @@ def generate_output(
     lines = [
         "LMSTAT_SIM_FORMAT_VERSION=1",
         f"server: {server} port: {port}",
-        f"timestamp: {datetime.utcnow().isoformat()}Z",
+        f"timestamp: {datetime.now(UTC).isoformat()}",
     ]
 
     for feature in features:
@@ -25,7 +25,14 @@ def generate_output(
         if include_details:
             for detail in feature.get("details", []):
                 lines.append(
-                    f"detail: {name} user={detail.get('user')} host={detail.get('host')} pid={detail.get('pid')}"
+                    "detail: "
+                    f"{name} "
+                    f"user={detail.get('user')} "
+                    f"host={detail.get('host')} "
+                    f"pid={detail.get('pid')} "
+                    f"checkout_id={detail.get('checkout_id')} "
+                    f"status={detail.get('status')} "
+                    f"granted_at={detail.get('granted_at')}"
                 )
 
     return "\n".join(lines)

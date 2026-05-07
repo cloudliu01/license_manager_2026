@@ -1,23 +1,8 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 from datetime import date
 
-
-@dataclass(frozen=True)
-class FeatureDef:
-    name: str
-    total: int
-    daemon: str
-    expires_at: date | None
-
-
-@dataclass(frozen=True)
-class LicenseConfig:
-    port: int
-    server_name: str | None
-    daemons: list[str]
-    features: dict[str, FeatureDef]
+from .models import FeatureDef, LicenseConfig
 
 
 def parse_license_text(text: str) -> LicenseConfig:
@@ -86,12 +71,7 @@ def parse_license_text(text: str) -> LicenseConfig:
 
             if daemon_name != "default" and daemon_name not in daemons:
                 raise ValueError("FEATURE references unknown daemon")
-            features[name] = FeatureDef(
-                name=name,
-                total=total,
-                daemon=daemon_name,
-                expires_at=expires_at,
-            )
+            features[name] = FeatureDef(name, total, daemon_name, expires_at)
             continue
 
         raise ValueError(f"Unknown keyword: {parts[0]}")
@@ -99,12 +79,7 @@ def parse_license_text(text: str) -> LicenseConfig:
     if port is None:
         raise ValueError("PORT is required")
 
-    return LicenseConfig(
-        port=port,
-        server_name=server_name,
-        daemons=daemons,
-        features=features,
-    )
+    return LicenseConfig(port, server_name, daemons, features)
 
 
 def parse_license_file(path: str) -> LicenseConfig:

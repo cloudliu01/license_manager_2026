@@ -1,0 +1,1 @@
+"""License manager simulator package."""
