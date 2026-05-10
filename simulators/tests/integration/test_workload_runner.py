@@ -32,3 +32,11 @@ def test_workload_runner_creates_valid_run_directory(tmp_path):
     raw_output = conn.execute("select raw_output from samples order by sample_id limit 1").fetchone()[0]
     assert "lmstat - Copyright" in raw_output
     assert "Users of" in raw_output
+    assert "License server status:" in raw_output
+    assert "    License file(s) on 127.0.0.1: /path/to/license.dat:" in raw_output
+    assert "Vendor daemon status (on 127.0.0.1):" in raw_output
+    assert "Feature usage info:" in raw_output
+    raw_output_with_checkout = conn.execute(
+        "select raw_output from samples where raw_output like '%  floating license%' limit 1"
+    ).fetchone()
+    assert raw_output_with_checkout is not None

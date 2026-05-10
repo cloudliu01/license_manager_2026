@@ -21,8 +21,8 @@ Users of alpha:  (Total of 5 licenses issued;  Total of 2 licenses in use)
   "alpha" v1.0, vendor: default, expiry: permanent
   floating license
 
-"user01" host01 /dev/pts/101 (v1.0) (127.0.0.1/27000 101), start Thu 5/7 00:00
-"user02" host02 /dev/pts/102 (v1.0) (127.0.0.1/27000 102) queued for 1 license
+    "user01" host01 /dev/pts/101 (v1.0) (127.0.0.1/27000 101), start Thu 5/7 00:00
+    "user02" host02 /dev/pts/102 (v1.0) (127.0.0.1/27000 102) queued for 1 license
 """.strip()
 
     parsed = parse_lmstat_output(output)

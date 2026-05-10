@@ -56,7 +56,7 @@ def _detail_line(server: str, port: int, detail: dict) -> str:
     host = detail.get("host")
     pid = detail.get("pid")
     status = detail.get("status")
-    prefix = f'"{user}" {host} /dev/pts/{pid} (v1.0) ({server}/{port} {pid})'
+    prefix = f'    "{user}" {host} /dev/pts/{pid} (v1.0) ({server}/{port} {pid})'
     if status == "QUEUED":
         return f"{prefix} queued for 1 license"
     return f"{prefix}, start {_format_start(detail.get('granted_at'))}"

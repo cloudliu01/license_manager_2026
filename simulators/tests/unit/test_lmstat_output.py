@@ -30,11 +30,15 @@ def test_generate_output_includes_details_for_verbose_mode():
     assert content.startswith("lmstat - Copyright")
     assert "Flexible License Manager status on" in content
     assert "License server status: 27000@127.0.0.1" in content
+    assert "    License file(s) on 127.0.0.1: /path/to/license.dat:" in content
+    assert "127.0.0.1: license server UP (MASTER) v11.19.5" in content
     assert "Vendor daemon status (on 127.0.0.1):" in content
+    assert "    default: UP v11.19.5" in content
     assert "Feature usage info:" in content
     assert "Users of alpha:  (Total of 2 licenses issued;  Total of 1 license in use)" in content
     assert '  "alpha" v1.0, vendor: default, expiry: permanent' in content
-    assert '"user1" host1 /dev/pts/101 (v1.0) (127.0.0.1/27000 101), start ' in content
+    assert "  floating license" in content
+    assert '    "user1" host1 /dev/pts/101 (v1.0) (127.0.0.1/27000 101), start ' in content
 
 
 def test_generate_output_includes_queued_detail_rows():
@@ -63,4 +67,4 @@ def test_generate_output_includes_queued_detail_rows():
         include_details=True,
     )
 
-    assert '"user2" host2 /dev/pts/102 (v1.0) (127.0.0.1/27000 102) queued for 1 license' in content
+    assert '    "user2" host2 /dev/pts/102 (v1.0) (127.0.0.1/27000 102) queued for 1 license' in content
