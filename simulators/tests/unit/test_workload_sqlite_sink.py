@@ -39,6 +39,7 @@ def test_sqlite_sink_records_samples_feature_rows_details_and_events(tmp_path):
 
     conn = sqlite3.connect(db_path)
     assert conn.execute("select count(*) from samples").fetchone()[0] == 1
+    assert conn.execute("select raw_output from samples").fetchone()[0] == "raw lmstat output"
     assert conn.execute("select feature, in_use from feature_samples").fetchone() == ("alpha", 2)
     assert conn.execute("select checkout_id from checkout_samples").fetchone()[0] == "co-1"
     assert conn.execute("select status from workload_events").fetchone()[0] == "GRANTED"

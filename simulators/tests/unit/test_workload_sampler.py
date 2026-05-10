@@ -3,11 +3,26 @@ from license_manager_simulators.workload.sampler import parse_lmstat_output
 
 def test_parse_lmstat_output_extracts_feature_and_checkout_rows():
     output = """
-LMSTAT_SIM_FORMAT_VERSION=1
-server: 127.0.0.1 port: 27000
-timestamp: 2026-05-07T00:00:00+00:00
-feature: alpha total=5 in_use=2 queued=1 expired=false
-detail: alpha user=user01 host=host01 pid=101 checkout_id=co-1 status=GRANTED granted_at=2026-05-07T00:00:00+00:00
+lmstat - Copyright (c) 1994-2024 Flexera. All rights reserved.
+Flexible License Manager status on Thu May 07 00:00:00 2026
+
+License server status: 27000@127.0.0.1
+    License file(s) on 127.0.0.1: /path/to/license.dat:
+
+127.0.0.1: license server UP (MASTER) v11.19.5
+
+Vendor daemon status (on 127.0.0.1):
+
+    default: UP v11.19.5
+Feature usage info:
+
+Users of alpha:  (Total of 5 licenses issued;  Total of 2 licenses in use)
+
+  "alpha" v1.0, vendor: default, expiry: permanent
+  floating license
+
+"user01" host01 /dev/pts/101 (v1.0) (127.0.0.1/27000 101), start Thu 5/7 00:00
+"user02" host02 /dev/pts/102 (v1.0) (127.0.0.1/27000 102) queued for 1 license
 """.strip()
 
     parsed = parse_lmstat_output(output)
@@ -21,8 +36,17 @@ detail: alpha user=user01 host=host01 pid=101 checkout_id=co-1 status=GRANTED gr
             "user": "user01",
             "host": "host01",
             "pid": 101,
-            "checkout_id": "co-1",
+            "checkout_id": "127.0.0.1/27000:101",
             "status": "GRANTED",
-            "granted_at": "2026-05-07T00:00:00+00:00",
-        }
+            "granted_at": "Thu 5/7 00:00",
+        },
+        {
+            "feature": "alpha",
+            "user": "user02",
+            "host": "host02",
+            "pid": 102,
+            "checkout_id": "127.0.0.1/27000:102",
+            "status": "QUEUED",
+            "granted_at": None,
+        },
     ]

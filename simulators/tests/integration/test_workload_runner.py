@@ -29,3 +29,6 @@ def test_workload_runner_creates_valid_run_directory(tmp_path):
     assert metadata["users"] == 6
     conn = sqlite3.connect(run_dir / "samples.sqlite")
     assert conn.execute("select count(*) from samples").fetchone()[0] >= 2
+    raw_output = conn.execute("select raw_output from samples order by sample_id limit 1").fetchone()[0]
+    assert "lmstat - Copyright" in raw_output
+    assert "Users of" in raw_output

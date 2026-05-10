@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import subprocess
+import re
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -18,34 +19,52 @@ class LmstatSnapshot:
 def parse_lmstat_output(output: str) -> LmstatSnapshot:
     features: list[dict] = []
     checkouts: list[dict] = []
+    current_feature: str | None = None
+    queued_by_feature: dict[str, int] = {}
     for raw_line in output.splitlines():
         line = raw_line.strip()
-        if line.startswith("feature: "):
-            parts = line.split()
-            values = _key_values(parts[2:])
+        users_match = re.match(
+            r"Users of (?P<feature>[^:]+):\s+\(Total of (?P<total>\d+) licenses issued;\s+Total of (?P<in_use>\d+) licenses? in use\)",
+            line,
+        )
+        if users_match:
+            current_feature = users_match.group("feature")
             features.append(
                 {
-                    "feature": parts[1],
-                    "total": int(values["total"]),
-                    "in_use": int(values["in_use"]),
-                    "queued": int(values["queued"]),
-                    "expired": values["expired"].lower() == "true",
+                    "feature": current_feature,
+                    "total": int(users_match.group("total")),
+                    "in_use": int(users_match.group("in_use")),
+                    "queued": 0,
+                    "expired": False,
                 }
             )
-        elif line.startswith("detail: "):
-            parts = line.split()
-            values = _key_values(parts[2:])
+            continue
+
+        detail_match = re.match(
+            r'"(?P<user>[^"]+)"\s+(?P<host>\S+)\s+/dev/pts/(?P<pid>\d+)\s+\(v[^)]*\)\s+\((?P<server>[^)]+)\s+(?P<server_pid>\d+)\)(?P<tail>.*)',
+            line,
+        )
+        if detail_match and current_feature:
+            is_queued = "queued for" in detail_match.group("tail")
+            if is_queued:
+                queued_by_feature[current_feature] = queued_by_feature.get(current_feature, 0) + 1
+            granted_at = None
+            start_match = re.search(r", start (?P<start>.+)$", detail_match.group("tail"))
+            if start_match:
+                granted_at = start_match.group("start")
             checkouts.append(
                 {
-                    "feature": parts[1],
-                    "user": values.get("user"),
-                    "host": values.get("host"),
-                    "pid": int(values["pid"]) if values.get("pid") not in (None, "None") else None,
-                    "checkout_id": values.get("checkout_id"),
-                    "status": values.get("status"),
-                    "granted_at": values.get("granted_at"),
+                    "feature": current_feature,
+                    "user": detail_match.group("user"),
+                    "host": detail_match.group("host"),
+                    "pid": int(detail_match.group("pid")),
+                    "checkout_id": f"{detail_match.group('server')}:{detail_match.group('server_pid')}",
+                    "status": "QUEUED" if is_queued else "GRANTED",
+                    "granted_at": granted_at,
                 }
             )
+    for feature in features:
+        feature["queued"] = queued_by_feature.get(feature["feature"], 0)
     return LmstatSnapshot(features=features, checkouts=checkouts, raw_output=output)
 
 

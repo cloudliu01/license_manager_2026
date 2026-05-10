@@ -32,8 +32,10 @@ def test_lmstat_retrieves_realtime_usage_and_lmgrd_appends_activity_log(tmp_path
             capture_output=True,
             text=True,
         )
-        assert "feature: alpha total=1 in_use=1 queued=0 expired=false" in result.stdout
-        assert f"checkout_id={checkout['checkout_id']}" in result.stdout
+        assert "lmstat - Copyright" in result.stdout
+        assert "Feature usage info:" in result.stdout
+        assert "Users of alpha:  (Total of 1 licenses issued;  Total of 1 license in use)" in result.stdout
+        assert '"user1" host1 /dev/pts/101' in result.stdout
 
         _post_json(port, "/v1/return", {"request_id": "r2", "checkout_id": checkout["checkout_id"]})
         result = subprocess.run(
@@ -42,7 +44,7 @@ def test_lmstat_retrieves_realtime_usage_and_lmgrd_appends_activity_log(tmp_path
             capture_output=True,
             text=True,
         )
-        assert "feature: alpha total=1 in_use=0 queued=0 expired=false" in result.stdout
+        assert "Users of alpha:  (Total of 1 licenses issued;  Total of 0 licenses in use)" in result.stdout
 
         content = log_path.read_text(encoding="utf-8")
         assert 'OUT: "alpha" user1@host1' in content
