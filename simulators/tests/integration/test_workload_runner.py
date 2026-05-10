@@ -29,7 +29,16 @@ def test_workload_runner_creates_valid_run_directory(tmp_path):
     assert metadata["users"] == 6
     conn = sqlite3.connect(run_dir / "samples.sqlite")
     assert conn.execute("select count(*) from samples").fetchone()[0] >= 2
-    raw_output = conn.execute("select raw_output from samples order by sample_id limit 1").fetchone()[0]
+    sample_id, sampled_at, raw_output = conn.execute(
+        "select sample_id, sampled_at, raw_output from samples order by sample_id limit 1"
+    ).fetchone()
+    assert conn.execute(
+        "select count(*) from feature_samples where sample_id = ? and sampled_at = ?",
+        (sample_id, sampled_at),
+    ).fetchone()[0] > 0
+    assert conn.execute(
+        "select 1 from checkout_samples join samples using(sample_id) where checkout_samples.sampled_at = samples.sampled_at limit 1"
+    ).fetchone() is not None
     assert "lmstat - Copyright" in raw_output
     assert "Users of" in raw_output
     assert "License server status:" in raw_output

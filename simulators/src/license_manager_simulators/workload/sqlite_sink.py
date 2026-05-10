@@ -30,10 +30,10 @@ class SQLiteSink:
             "create table if not exists samples (sample_id integer primary key autoincrement, sampled_at text not null, raw_output text not null)"
         )
         self.conn.execute(
-            "create table if not exists feature_samples (sample_id integer not null, feature text not null, total integer not null, in_use integer not null, queued integer not null, expired integer not null)"
+            "create table if not exists feature_samples (sample_id integer not null, sampled_at text not null, feature text not null, total integer not null, in_use integer not null, queued integer not null, expired integer not null)"
         )
         self.conn.execute(
-            "create table if not exists checkout_samples (sample_id integer not null, feature text not null, user text, host text, pid integer, checkout_id text, status text, granted_at text)"
+            "create table if not exists checkout_samples (sample_id integer not null, sampled_at text not null, feature text not null, user text, host text, pid integer, checkout_id text, status text, granted_at text)"
         )
         self.conn.execute(
             "create table if not exists workload_events (event_id integer primary key autoincrement, event_time text not null, user text not null, action text not null, feature text, status text, reason text, checkout_id text)"
@@ -47,9 +47,10 @@ class SQLiteSink:
             sample_id = int(cursor.lastrowid)
             for feature in features:
                 conn.execute(
-                    "insert into feature_samples values (?, ?, ?, ?, ?, ?)",
+                    "insert into feature_samples values (?, ?, ?, ?, ?, ?, ?)",
                     (
                         sample_id,
+                        sampled_at,
                         feature["feature"],
                         int(feature["total"]),
                         int(feature["in_use"]),
@@ -59,9 +60,10 @@ class SQLiteSink:
                 )
             for checkout in checkouts:
                 conn.execute(
-                    "insert into checkout_samples values (?, ?, ?, ?, ?, ?, ?, ?)",
+                    "insert into checkout_samples values (?, ?, ?, ?, ?, ?, ?, ?, ?)",
                     (
                         sample_id,
+                        sampled_at,
                         checkout.get("feature"),
                         checkout.get("user"),
                         checkout.get("host"),

@@ -40,6 +40,8 @@ def main() -> int:
 
     by_feature: dict[str, list[dict]] = {}
     for detail in details.get("checkouts", []):
+        if detail.get("status") not in {"GRANTED", "QUEUED"}:
+            continue
         by_feature.setdefault(detail.get("feature"), []).append(detail)
 
     features = []

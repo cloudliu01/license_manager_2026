@@ -57,6 +57,48 @@ def test_lmstat_retrieves_realtime_usage_and_lmgrd_appends_activity_log(tmp_path
             proc.kill()
 
 
+def test_lmstat_details_exclude_returned_checkouts_after_queue_promotion(tmp_path):
+    port = _free_port()
+    root = Path(__file__).resolve().parents[2]
+    lmgrd = root / "wrappers" / "lmgrd"
+    lmstat = root / "wrappers" / "lmstat"
+    license_path = tmp_path / "license.dat"
+    log_path = tmp_path / "license.log"
+    license_path.write_text(f"PORT {port}\nFEATURE alpha 1\n", encoding="utf-8")
+
+    proc = subprocess.Popen([str(lmgrd), "-c", str(license_path), "-l", str(log_path)])
+    try:
+        _wait_for_health(port)
+        first = _post_json(
+            port,
+            "/v1/checkout",
+            {"request_id": "r1", "feature": "alpha", "user": "returned_user", "host": "host1", "pid": 101},
+        )
+        _post_json(
+            port,
+            "/v1/checkout",
+            {"request_id": "r2", "feature": "alpha", "user": "active_user", "host": "host2", "pid": 102},
+        )
+        _post_json(port, "/v1/return", {"request_id": "r3", "checkout_id": first["checkout_id"]})
+
+        result = subprocess.run(
+            [str(lmstat), "-c", f"{port}@127.0.0.1", "-a", "-i"],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+        assert "Users of alpha:  (Total of 1 licenses issued;  Total of 1 license in use)" in result.stdout
+        assert '"active_user" host2 /dev/pts/102' in result.stdout
+        assert '"returned_user" host1 /dev/pts/101' not in result.stdout
+    finally:
+        proc.send_signal(signal.SIGTERM)
+        try:
+            proc.wait(timeout=3)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+
+
 def test_lmstat_exits_nonzero_when_service_unreachable():
     port = _free_port()
     root = Path(__file__).resolve().parents[2]
