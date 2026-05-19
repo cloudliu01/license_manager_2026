@@ -24,7 +24,7 @@ def parse_lmstat_output(output: str) -> LmstatSnapshot:
     for raw_line in output.splitlines():
         line = raw_line.strip()
         users_match = re.match(
-            r"Users of (?P<feature>[^:]+):\s+\(Total of (?P<total>\d+) licenses issued;\s+Total of (?P<in_use>\d+) licenses? in use\)",
+            r"Users of (?P<feature>[^:]+):\s+\(Total of (?P<total>\d+) licenses? issued;\s+Total of (?P<in_use>\d+) licenses? in use\)",
             line,
         )
         if users_match:

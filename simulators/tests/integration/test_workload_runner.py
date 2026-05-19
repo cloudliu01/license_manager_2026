@@ -40,6 +40,7 @@ def test_workload_runner_creates_valid_run_directory(tmp_path):
         "select 1 from checkout_samples join samples using(sample_id) where checkout_samples.sampled_at = samples.sampled_at limit 1"
     ).fetchone() is not None
     assert "lmstat - Copyright" in raw_output
+    assert "[Detecting lmgrd processes...]" not in raw_output
     assert "Users of" in raw_output
     assert "License server status:" in raw_output
     assert "    License file(s) on 127.0.0.1: /path/to/license.dat:" in raw_output

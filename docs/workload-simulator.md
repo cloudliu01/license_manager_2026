@@ -7,7 +7,7 @@ Use the workload simulator to generate synthetic license activity, sample `lmsta
 Generate a short workload run:
 
 ```bash
-PYTHONPATH=simulators/src python -m license_manager_simulators.workload.cli run \
+conda run -n venv312_license_manager python -m license_manager_simulators.workload.cli run \
   --duration-seconds 6 \
   --users 6 \
   --sample-interval-seconds 2 \
@@ -40,7 +40,7 @@ Each run directory contains:
 Validate a generated run directory:
 
 ```bash
-PYTHONPATH=simulators/src python -m license_manager_simulators.workload.cli validate \
+conda run -n venv312_license_manager python -m license_manager_simulators.workload.cli validate \
   --run-dir runs/raw-output-check \
   --min-samples 2
 ```

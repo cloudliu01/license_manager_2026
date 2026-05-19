@@ -12,7 +12,7 @@ Create a small simulator license file:
 cat > /tmp/license.dat <<'EOF'
 SERVER_NAME lic_server_1
 PORT 27000
-FEATURE alpha 2
+FEATURE alpha 2 EXP 2026-11-01
 FEATURE beta 1
 EOF
 ```
@@ -23,14 +23,14 @@ Supported license-file lines:
 - `PORT <port>`: required HTTP/listener port for the simulator.
 - `DAEMON <name>`: optional vendor daemon name.
 - `FEATURE <name> <total>`: feature name and license count.
-- `FEATURE <name> <total> DAEMON <daemon> EXP <YYYY-MM-DD>`: optional daemon and expiration.
+- `FEATURE <name> <total> DAEMON <daemon> EXP <YYYY-MM-DD>`: optional daemon and expiration. `lmstat -i` renders expiration as `DD-Mon-YYYY`, for example `01-Nov-2026`.
 
 ## Start lmgrd
 
 Start the daemon in one terminal:
 
 ```bash
-PYTHONPATH=simulators/src simulators/wrappers/lmgrd \
+conda run -n venv312_license_manager simulators/wrappers/lmgrd \
   -c /tmp/license.dat \
   -l /tmp/lmgrd.log
 ```
@@ -97,30 +97,38 @@ When a granted license is returned and the feature has queued requests, the simu
 Print all feature usage to the screen:
 
 ```bash
-PYTHONPATH=simulators/src simulators/wrappers/lmstat -c 27000@127.0.0.1 -a
+conda run -n venv312_license_manager simulators/wrappers/lmstat -c 27000@127.0.0.1 -a
 ```
 
 Print all feature usage with checkout details:
 
 ```bash
-PYTHONPATH=simulators/src simulators/wrappers/lmstat -c 27000@127.0.0.1 -a -i
+conda run -n venv312_license_manager simulators/wrappers/lmstat -c 27000@127.0.0.1 -a -i
 ```
 
 Print one feature with details:
 
 ```bash
-PYTHONPATH=simulators/src simulators/wrappers/lmstat -c 27000@127.0.0.1 -f alpha -i
+conda run -n venv312_license_manager simulators/wrappers/lmstat -c 27000@127.0.0.1 -f alpha -i
 ```
 
 `lmstat` writes FlexNet-style output to stdout. Example detail rows include granted and queued checkout records:
 
 ```text
-Users of alpha:  (Total of 2 licenses issued;  Total of 1 license in use)
+Users of alpha:               (Total of 2 licenses issued;  Total of 1 license in use)
 
-  "alpha" v1.0, vendor: default, expiry: permanent
+  "alpha" v1.0, vendor: default, expiry: 01-Nov-2026
   floating license
 
     "user1" host1 /dev/pts/101 (v1.0) (127.0.0.1/27000 101), start Sun 5/10 08:40
+
+NOTE: lmstat -i does not give information from the server,
+      but only reads the license file.  For this reason,
+      lmstat -a is recommended instead.
+
+Feature                         Version     #licenses    Expires      Vendor
+_______                         _________   _________    __________   ______
+alpha                           1.0         2           01-Nov-2026  default
 ```
 
 Returned checkouts are excluded from `lmstat -i` detail output.

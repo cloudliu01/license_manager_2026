@@ -16,4 +16,5 @@ def test_parse_license_text_groups_features_by_daemon():
     assert config.server_name == "test-host"
     assert config.daemons == ["vendorA"]
     assert config.features["alpha"].daemon == "vendorA"
+    assert config.features["alpha"].expires_at.isoformat() == "2026-12-31"
     assert config.features["beta"].daemon == "default"

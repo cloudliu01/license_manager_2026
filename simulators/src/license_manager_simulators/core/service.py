@@ -115,8 +115,16 @@ class SimulatorService:
 
             checkout_id = str(uuid4())
             position = self.store.next_queue_position(feature_name, feature["daemon"])
-            self.store.add_checkout(checkout_id, feature_name, feature["daemon"], user, host, pid, "QUEUED", now, None)
-            self.store.add_queue(checkout_id, feature_name, feature["daemon"], user, host, pid, now, position)
+            self.store.add_queued_checkout(
+                checkout_id,
+                feature_name,
+                feature["daemon"],
+                user,
+                host,
+                pid,
+                now,
+                position,
+            )
             result = CheckoutResult(
                 "QUEUED", None, checkout_id, feature_name, feature["daemon"], feature["total"], feature["in_use"], queued_count + 1
             )
@@ -154,10 +162,26 @@ class SimulatorService:
                 self.store.cache_set(request_id, "return", result.__dict__, now)
                 return result
 
-            self.store.mark_returned(record, now)
+            if record.status == "QUEUED":
+                self.store.return_queued(record, now)
+                feature = self.store.get_feature(record.feature)
+                result = CheckoutResult(
+                    "RETURNED",
+                    None,
+                    record.checkout_id,
+                    record.feature,
+                    record.daemon,
+                    feature["total"] if feature else 0,
+                    feature["in_use"] if feature else 0,
+                    self.store.queue_count(record.feature, record.daemon),
+                )
+                self.store.event("RETURNED_CHECKOUT", result.__dict__, now)
+                self.store.cache_set(request_id, "return", result.__dict__, now)
+                return result
+
+            granted = self.store.return_granted_and_promote_next(record, now)
             self.log_writer.returned(record.daemon, record.feature, record.user, record.host, record.pid, record.checkout_id)
             feature = self.store.get_feature(record.feature)
-            granted = self.store.grant_next_queued(record.feature, record.daemon, now)
             if granted:
                 self.log_writer.checkout_granted(
                     granted.daemon, granted.feature, granted.user, granted.host, granted.pid, granted.checkout_id

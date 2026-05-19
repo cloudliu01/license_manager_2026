@@ -1,25 +1,14 @@
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
+from datetime import UTC, datetime
 from uuid import uuid4
 
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
 
 from license_manager_simulators.core.service import SimulatorService
 
-
-class CheckoutRequest(BaseModel):
-    request_id: str | None = None
-    feature: str
-    user: str
-    host: str
-    pid: int
-
-
-class ReturnRequest(BaseModel):
-    request_id: str | None = None
-    checkout_id: str
+from .schemas import CheckoutRequest, OperationResponse, ReturnRequest
 
 
 def create_app(service: SimulatorService) -> FastAPI:
@@ -39,7 +28,7 @@ def create_app(service: SimulatorService) -> FastAPI:
         return service.status()
 
     @app.post("/v1/checkout")
-    def checkout(payload: CheckoutRequest):
+    def checkout(payload: CheckoutRequest) -> dict:
         request_id = payload.request_id or str(uuid4())
         try:
             result = service.checkout(
@@ -50,7 +39,7 @@ def create_app(service: SimulatorService) -> FastAPI:
         return _result_response(result, request_id)
 
     @app.post("/v1/return")
-    def return_checkout(payload: ReturnRequest):
+    def return_checkout(payload: ReturnRequest) -> dict:
         request_id = payload.request_id or str(uuid4())
         try:
             result = service.return_checkout(payload.checkout_id, request_id=request_id)
@@ -85,22 +74,8 @@ def create_app(service: SimulatorService) -> FastAPI:
 
 
 def _result_response(result, request_id: str) -> dict:
-    return {
-        "protocol_version": 1,
-        "server_time": service_time(),
-        "request_id": request_id,
-        "checkout_id": result.checkout_id,
-        "feature": result.feature,
-        "daemon": result.daemon,
-        "status": result.status,
-        "reason": result.reason,
-        "total": result.total,
-        "in_use": result.in_use,
-        "queued": result.queued,
-    }
+    return OperationResponse.from_result(result, request_id, service_time()).model_dump()
 
 
 def service_time() -> str:
-    from datetime import UTC, datetime
-
     return datetime.now(UTC).isoformat()

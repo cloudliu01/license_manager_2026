@@ -18,7 +18,7 @@ The simulator is CLI-compatible for the workflows below, but it does not impleme
 ## Requirements
 
 - Python 3.11+
-- Project dependencies available on `PYTHONPATH=simulators/src`
+- Project dependencies installed in `venv312_license_manager`
 - `curl` for manual checkout/checkin examples
 - `sqlite3` CLI for inspecting workload databases
 
@@ -27,7 +27,7 @@ The simulator is CLI-compatible for the workflows below, but it does not impleme
 Run a short workload and inspect the first raw `lmstat` snapshot:
 
 ```bash
-PYTHONPATH=simulators/src python -m license_manager_simulators.workload.cli run \
+conda run -n venv312_license_manager python -m license_manager_simulators.workload.cli run \
   --duration-seconds 6 \
   --users 6 \
   --sample-interval-seconds 2 \
@@ -43,6 +43,6 @@ sqlite3 runs/raw-output-check/samples.sqlite \
 Run the simulator test suite and lint checks:
 
 ```bash
-pytest -q
-ruff check .
+conda run -n venv312_license_manager python -m pytest -q
+conda run -n venv312_license_manager python -m ruff check .
 ```

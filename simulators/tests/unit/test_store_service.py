@@ -20,11 +20,12 @@ def _service(features: dict[str, FeatureDef]) -> SimulatorService:
 
 
 def test_checkout_return_and_status_snapshot_update_in_realtime():
-    service = _service({"alpha": FeatureDef("alpha", 1, "default", None)})
+    service = _service({"alpha": FeatureDef("alpha", 1, "default", date(2026, 11, 1))})
 
     checkout = service.checkout("alpha", "user1", "host1", 101, request_id="r1")
     assert checkout.status == "GRANTED"
     assert service.status()["features"][0]["in_use"] == 1
+    assert service.status()["features"][0]["expires_at"] == "2026-11-01"
 
     returned = service.return_checkout(checkout.checkout_id, request_id="r2")
     assert returned.status == "RETURNED"
@@ -50,6 +51,22 @@ def test_queue_counts_are_per_feature_and_dequeue_same_feature_only():
     service.return_checkout(first.checkout_id, request_id="r4")
     checkouts = {item["checkout_id"]: item for item in service.debug_checkouts()}
     assert checkouts[queued.checkout_id]["status"] == "GRANTED"
+
+
+def test_returning_queued_checkout_does_not_release_granted_license():
+    service = _service({"alpha": FeatureDef("alpha", 1, "default", None)})
+
+    granted = service.checkout("alpha", "user1", "host1", 101, request_id="r1")
+    queued = service.checkout("alpha", "user2", "host2", 102, request_id="r2")
+
+    returned = service.return_checkout(queued.checkout_id, request_id="r3")
+
+    assert granted.status == "GRANTED"
+    assert queued.status == "QUEUED"
+    assert returned.status == "RETURNED"
+    feature = service.status()["features"][0]
+    assert feature["in_use"] == 1
+    assert feature["queued"] == 0
 
 
 def test_repeated_request_id_returns_same_checkout_response():

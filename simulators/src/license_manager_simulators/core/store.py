@@ -156,6 +156,45 @@ class SimulatorStore:
             self.conn.execute("update features set in_use = in_use + 1 where name = ?", (feature,))
         self.conn.commit()
 
+    def add_queued_checkout(
+        self,
+        checkout_id: str,
+        feature: str,
+        daemon: str,
+        user: str,
+        host: str,
+        pid: int,
+        requested_at: datetime,
+        position: int,
+    ) -> None:
+        with self.conn:
+            self.conn.execute(
+                "insert into checkouts values (?, ?, ?, ?, ?, ?, 'QUEUED', ?, null, null)",
+                (
+                    checkout_id,
+                    feature,
+                    daemon,
+                    user,
+                    host,
+                    pid,
+                    requested_at.isoformat(),
+                ),
+            )
+            self.conn.execute(
+                "insert into queue values (?, ?, ?, ?, ?, ?, ?, ?, ?, 'QUEUED')",
+                (
+                    str(uuid4()),
+                    checkout_id,
+                    feature,
+                    daemon,
+                    user,
+                    host,
+                    pid,
+                    requested_at.isoformat(),
+                    position,
+                ),
+            )
+
     def add_queue(self, checkout_id: str, feature: str, daemon: str, user: str, host: str, pid: int, requested_at: datetime, position: int) -> None:
         self.conn.execute(
             "insert into queue values (?, ?, ?, ?, ?, ?, ?, ?, ?, 'QUEUED')",
@@ -172,6 +211,45 @@ class SimulatorStore:
             "update features set in_use = max(in_use - 1, 0) where name = ?", (record.feature,)
         )
         self.conn.commit()
+
+    def return_queued(self, record: CheckoutRecord, returned_at: datetime) -> None:
+        with self.conn:
+            self.conn.execute(
+                "update checkouts set status = 'RETURNED', returned_at = ? where checkout_id = ?",
+                (returned_at.isoformat(), record.checkout_id),
+            )
+            self.conn.execute("delete from queue where checkout_id = ?", (record.checkout_id,))
+
+    def return_granted_and_promote_next(
+        self, record: CheckoutRecord, returned_at: datetime
+    ) -> CheckoutRecord | None:
+        with self.conn:
+            self.conn.execute(
+                "update checkouts set status = 'RETURNED', returned_at = ? where checkout_id = ?",
+                (returned_at.isoformat(), record.checkout_id),
+            )
+            self.conn.execute(
+                "update features set in_use = max(in_use - 1, 0) where name = ?",
+                (record.feature,),
+            )
+            row = self.conn.execute(
+                "select * from queue where feature = ? and daemon = ? and status = 'QUEUED' order by position limit 1",
+                (record.feature, record.daemon),
+            ).fetchone()
+            if row is None:
+                return None
+            self.conn.execute("delete from queue where queue_id = ?", (row["queue_id"],))
+            self.conn.execute(
+                "update checkouts set status = 'GRANTED', granted_at = ? where checkout_id = ?",
+                (returned_at.isoformat(), row["checkout_id"]),
+            )
+            self.conn.execute(
+                "update features set in_use = in_use + 1 where name = ?", (record.feature,)
+            )
+        checkout = self.get_checkout(row["checkout_id"])
+        if checkout is None:
+            raise RuntimeError("Queued checkout missing")
+        return checkout
 
     def grant_next_queued(self, feature: str, daemon: str, granted_at: datetime) -> CheckoutRecord | None:
         row = self.conn.execute(
@@ -206,6 +284,7 @@ class SimulatorStore:
                     "in_use": row["in_use"],
                     "queued": self.queue_count(row["name"], row["daemon"]),
                     "expired": bool(expires_at and expires_at < today),
+                    "expires_at": expires_at.isoformat() if expires_at else None,
                 }
             )
         return items
