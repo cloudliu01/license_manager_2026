@@ -9,12 +9,12 @@ from license_manager_simulators.core.store import SimulatorStore
 from license_manager_simulators.lmgrd.app import create_app
 
 
-def _client() -> TestClient:
+def _client(total: int = 4) -> TestClient:
     config = LicenseConfig(
         port=27000,
         server_name="test-host",
         daemons=[],
-        features={"alpha": FeatureDef("alpha", 1, "default", None)},
+        features={"alpha": FeatureDef("alpha", total, "default", None)},
     )
     service = SimulatorService(
         store=SimulatorStore.from_license(config),
@@ -34,15 +34,26 @@ def test_checkout_return_and_debug_endpoints_expose_realtime_state():
 
     checkout = client.post(
         "/v1/checkout",
-        json={"request_id": "r1", "feature": "alpha", "user": "user1", "host": "host1", "pid": 101},
+        json={
+            "request_id": "r1",
+            "feature": "alpha",
+            "user": "user1",
+            "host": "host1",
+            "pid": 101,
+            "quantity": 3,
+            "info": "info_APS_26",
+        },
     ).json()
     assert checkout["status"] == "GRANTED"
+    assert checkout["quantity"] == 3
 
     status = client.get("/v1/status").json()
-    assert status["features"][0]["in_use"] == 1
+    assert status["features"][0]["in_use"] == 3
 
     debug = client.get("/v1/debug/checkouts", params={"status": "GRANTED"}).json()
     assert debug["checkouts"][0]["checkout_id"] == checkout["checkout_id"]
+    assert debug["checkouts"][0]["quantity"] == 3
+    assert debug["checkouts"][0]["info"] == "info_APS_26"
 
     returned = client.post("/v1/return", json={"request_id": "r2", "checkout_id": checkout["checkout_id"]}).json()
     assert returned["status"] == "RETURNED"
@@ -50,7 +61,7 @@ def test_checkout_return_and_debug_endpoints_expose_realtime_state():
 
 
 def test_debug_queue_filters_by_feature():
-    client = _client()
+    client = _client(total=1)
     client.post(
         "/v1/checkout",
         json={"request_id": "r1", "feature": "alpha", "user": "user1", "host": "host1", "pid": 101},

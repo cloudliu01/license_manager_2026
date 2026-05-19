@@ -28,6 +28,8 @@ class CheckoutRecord:
     user: str
     host: str
     pid: int
+    quantity: int
+    info: str | None
     status: str
     requested_at: datetime
     granted_at: datetime | None = None
@@ -44,3 +46,4 @@ class CheckoutResult:
     total: int
     in_use: int
     queued: int
+    quantity: int = 1

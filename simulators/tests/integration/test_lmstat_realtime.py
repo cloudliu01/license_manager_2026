@@ -51,8 +51,8 @@ def test_lmstat_retrieves_realtime_usage_and_lmgrd_appends_activity_log(tmp_path
         assert "Users of alpha:               (Total of 1 license issued;  Total of 0 licenses in use)" in result.stdout
 
         content = log_path.read_text(encoding="utf-8")
-        assert 'OUT: "alpha" user1@host1' in content
-        assert 'IN: "alpha" user1@host1' in content
+        assert 'OUT:\t"alpha"\tuser1@host1' in content
+        assert 'IN:\t"alpha"\tuser1@host1' in content
     finally:
         proc.send_signal(signal.SIGTERM)
         try:
@@ -90,6 +90,49 @@ def test_lmstat_without_feature_flags_shows_header_and_daemon_status_only(tmp_pa
         assert "Feature usage info:" not in result.stdout
         assert "Users of alpha:" not in result.stdout
         assert "NOTE: lmstat -i" not in result.stdout
+    finally:
+        proc.send_signal(signal.SIGTERM)
+        try:
+            proc.wait(timeout=3)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+
+
+def test_lmstat_groups_feature_usage_under_each_vendor_daemon(tmp_path):
+    port = _free_port()
+    root = Path(__file__).resolve().parents[2]
+    lmgrd = root / "wrappers" / "lmgrd"
+    lmstat = root / "wrappers" / "lmstat"
+    license_path = tmp_path / "license.dat"
+    log_path = tmp_path / "license.log"
+    license_path.write_text(
+        f"PORT {port}\nDAEMON d1lmd\nDAEMON d2lmd\n"
+        "FEATURE alpha 2 DAEMON d1lmd EXP 2026-11-01\n"
+        "FEATURE beta 1 DAEMON d2lmd\n",
+        encoding="utf-8",
+    )
+
+    proc = subprocess.Popen([str(lmgrd), "-c", str(license_path), "-l", str(log_path)])
+    try:
+        _wait_for_health(port)
+        _post_json(
+            port,
+            "/v1/checkout",
+            {"request_id": "r1", "feature": "alpha", "user": "user1", "host": "host1", "pid": 101},
+        )
+        result = subprocess.run(
+            [str(lmstat), "-c", f"{port}@127.0.0.1", "-a", "-i"],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+        output = result.stdout
+        assert output.index("    d1lmd: UP") < output.index("Users of alpha:")
+        assert output.index("Users of alpha:") < output.index('  "alpha" v1.0, vendor: d1lmd')
+        assert output.index('    "user1" host1') < output.index("    d2lmd: UP")
+        assert output.index("    d2lmd: UP") < output.index("Users of beta:")
+        assert output.index("Users of beta:") < output.index("NOTE: lmstat -i")
     finally:
         proc.send_signal(signal.SIGTERM)
         try:

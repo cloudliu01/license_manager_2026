@@ -32,7 +32,13 @@ def create_app(service: SimulatorService) -> FastAPI:
         request_id = payload.request_id or str(uuid4())
         try:
             result = service.checkout(
-                payload.feature, payload.user, payload.host, payload.pid, request_id=request_id
+                payload.feature,
+                payload.user,
+                payload.host,
+                payload.pid,
+                request_id=request_id,
+                quantity=payload.quantity,
+                info=payload.info,
             )
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc

@@ -44,6 +44,8 @@ class SimulatorStore:
                 user text not null,
                 host text not null,
                 pid integer not null,
+                quantity integer not null,
+                info text,
                 status text not null,
                 requested_at text not null,
                 granted_at text,
@@ -134,12 +136,14 @@ class SimulatorStore:
         user: str,
         host: str,
         pid: int,
+        quantity: int,
+        info: str | None,
         status: str,
         requested_at: datetime,
         granted_at: datetime | None,
     ) -> None:
         self.conn.execute(
-            "insert into checkouts values (?, ?, ?, ?, ?, ?, ?, ?, ?, null)",
+            "insert into checkouts values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, null)",
             (
                 checkout_id,
                 feature,
@@ -147,13 +151,15 @@ class SimulatorStore:
                 user,
                 host,
                 pid,
+                quantity,
+                info,
                 status,
                 requested_at.isoformat(),
                 granted_at.isoformat() if granted_at else None,
             ),
         )
         if status == "GRANTED":
-            self.conn.execute("update features set in_use = in_use + 1 where name = ?", (feature,))
+            self.conn.execute("update features set in_use = in_use + ? where name = ?", (quantity, feature))
         self.conn.commit()
 
     def add_queued_checkout(
@@ -164,12 +170,14 @@ class SimulatorStore:
         user: str,
         host: str,
         pid: int,
+        quantity: int,
+        info: str | None,
         requested_at: datetime,
         position: int,
     ) -> None:
         with self.conn:
             self.conn.execute(
-                "insert into checkouts values (?, ?, ?, ?, ?, ?, 'QUEUED', ?, null, null)",
+                "insert into checkouts values (?, ?, ?, ?, ?, ?, ?, ?, 'QUEUED', ?, null, null)",
                 (
                     checkout_id,
                     feature,
@@ -177,6 +185,8 @@ class SimulatorStore:
                     user,
                     host,
                     pid,
+                    quantity,
+                    info,
                     requested_at.isoformat(),
                 ),
             )
@@ -208,7 +218,8 @@ class SimulatorStore:
             (returned_at.isoformat(), record.checkout_id),
         )
         self.conn.execute(
-            "update features set in_use = max(in_use - 1, 0) where name = ?", (record.feature,)
+            "update features set in_use = max(in_use - ?, 0) where name = ?",
+            (record.quantity, record.feature),
         )
         self.conn.commit()
 
@@ -229,11 +240,22 @@ class SimulatorStore:
                 (returned_at.isoformat(), record.checkout_id),
             )
             self.conn.execute(
-                "update features set in_use = max(in_use - 1, 0) where name = ?",
-                (record.feature,),
+                "update features set in_use = max(in_use - ?, 0) where name = ?",
+                (record.quantity, record.feature),
             )
             row = self.conn.execute(
-                "select * from queue where feature = ? and daemon = ? and status = 'QUEUED' order by position limit 1",
+                """
+                select q.*
+                from queue q
+                join checkouts c on c.checkout_id = q.checkout_id
+                join features f on f.name = q.feature
+                where q.feature = ?
+                  and q.daemon = ?
+                  and q.status = 'QUEUED'
+                  and c.quantity <= (f.total - f.in_use)
+                order by q.position
+                limit 1
+                """,
                 (record.feature, record.daemon),
             ).fetchone()
             if row is None:
@@ -244,7 +266,14 @@ class SimulatorStore:
                 (returned_at.isoformat(), row["checkout_id"]),
             )
             self.conn.execute(
-                "update features set in_use = in_use + 1 where name = ?", (record.feature,)
+                """
+                update features
+                set in_use = in_use + (
+                    select quantity from checkouts where checkout_id = ?
+                )
+                where name = ?
+                """,
+                (row["checkout_id"], record.feature),
             )
         checkout = self.get_checkout(row["checkout_id"])
         if checkout is None:
@@ -263,7 +292,16 @@ class SimulatorStore:
             "update checkouts set status = 'GRANTED', granted_at = ? where checkout_id = ?",
             (granted_at.isoformat(), row["checkout_id"]),
         )
-        self.conn.execute("update features set in_use = in_use + 1 where name = ?", (feature,))
+        self.conn.execute(
+            """
+            update features
+            set in_use = in_use + (
+                select quantity from checkouts where checkout_id = ?
+            )
+            where name = ?
+            """,
+            (row["checkout_id"], feature),
+        )
         self.conn.commit()
         checkout = self.get_checkout(row["checkout_id"])
         if checkout is None:
@@ -353,13 +391,15 @@ class SimulatorStore:
 
 
 def _record_from_row(row: sqlite3.Row) -> CheckoutRecord:
-    return CheckoutRecord(
+        return CheckoutRecord(
         checkout_id=row["checkout_id"],
         feature=row["feature"],
         daemon=row["daemon"],
         user=row["user"],
         host=row["host"],
         pid=row["pid"],
+        quantity=row["quantity"],
+        info=row["info"],
         status=row["status"],
         requested_at=datetime.fromisoformat(row["requested_at"]),
         granted_at=datetime.fromisoformat(row["granted_at"]) if row["granted_at"] else None,

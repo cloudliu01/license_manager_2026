@@ -6,7 +6,17 @@ from typing import TextIO
 
 
 def _time_prefix(ts: datetime, tag: str, message: str) -> str:
-    return f"{ts:%H:%M:%S} ({tag}) {message}"
+    return f"{ts.hour}:{ts:%M:%S}\t({tag})\t{message}"
+
+
+def _client_info(info: str | None) -> str:
+    return f"\t[{info}]" if info else ""
+
+
+def _license_count(quantity: int) -> str:
+    if quantity <= 1:
+        return ""
+    return f"\t({quantity}\tlicenses)"
 
 
 class MemoryLogWriter:
@@ -17,21 +27,51 @@ class MemoryLogWriter:
         self.lines.append(_time_prefix(ts or datetime.now(), tag, message))
 
     def checkout_granted(
-        self, daemon: str, feature: str, user: str, host: str, pid: int, checkout_id: str
+        self,
+        daemon: str,
+        feature: str,
+        user: str,
+        host: str,
+        pid: int,
+        checkout_id: str,
+        quantity: int = 1,
+        info: str | None = None,
     ) -> None:
         self.write_line(
-            daemon, f'OUT: "{feature}" {user}@{host} [pid={pid} checkout_id={checkout_id}]'
+            daemon,
+            f'OUT:\t"{feature}"\t{user}@{host}{_client_info(info)}{_license_count(quantity)}',
         )
 
     def returned(
-        self, daemon: str, feature: str, user: str, host: str, pid: int, checkout_id: str
+        self,
+        daemon: str,
+        feature: str,
+        user: str,
+        host: str,
+        pid: int,
+        checkout_id: str,
+        quantity: int = 1,
+        info: str | None = None,
     ) -> None:
         self.write_line(
-            daemon, f'IN: "{feature}" {user}@{host} [pid={pid} checkout_id={checkout_id}]'
+            daemon,
+            f'IN:\t"{feature}"\t{user}@{host}{_client_info(info)}{_license_count(quantity)}',
         )
 
-    def denied(self, daemon: str, feature: str, user: str, host: str, reason: str) -> None:
-        self.write_line(daemon, f'DENIED: "{feature}" {user}@{host} [reason={reason}]')
+    def unsupported(
+        self, daemon: str, feature: str, user: str, host: str, info: str | None = None
+    ) -> None:
+        self.write_line(
+            daemon,
+            f'UNSUPPORTED:\t"{feature}"\t{user}@{host}{_client_info(info)}\t'
+            '(No such feature exists. (-5,346:104 "Connection reset by peer"))',
+        )
+
+    def denied(
+        self, daemon: str, feature: str, user: str, host: str, reason: str, info: str | None = None
+    ) -> None:
+        message = _denied_message(reason)
+        self.write_line(daemon, f'DENIED:\t"{feature}"\t{user}@{host}{_client_info(info)}\t{message}')
 
     def queued(
         self,
@@ -126,3 +166,11 @@ def vendor_daemon_startup(
         _time_prefix(ts, daemon, f"Server started on {host} for: {'  '.join(features)}"),
         _time_prefix(ts, daemon, f"All FEATURE lines for {daemon} behave like INCREMENT lines"),
     ]
+
+
+def _denied_message(reason: str) -> str:
+    if reason in {"LICENSE_LIMIT_REACHED", "QUEUE_FULL"}:
+        return '(Licensed number of users already reached. (-4,342:104 "Connection reset by peer"))'
+    if reason == "FEATURE_EXPIRED":
+        return '(Feature has expired. (-10,346:104 "Connection reset by peer"))'
+    return f'({reason}. (-4,342:104 "Connection reset by peer"))'

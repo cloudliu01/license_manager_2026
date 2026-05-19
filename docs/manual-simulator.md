@@ -55,7 +55,9 @@ curl -s -X POST http://127.0.0.1:27000/v1/checkout \
     "feature": "alpha",
     "user": "user1",
     "host": "host1",
-    "pid": 101
+    "pid": 101,
+    "quantity": 2,
+    "info": "info_APS_26"
   }'
 ```
 
@@ -76,6 +78,8 @@ Example response:
 Save the returned `checkout_id`; you need it to return the license.
 
 If all licenses for a feature are already in use, the simulator returns `status: "QUEUED"` and keeps the request in the feature queue.
+
+`quantity` defaults to `1`. When `quantity` is greater than `1`, one checkout consumes that many licenses and one return releases the same number. `info` is optional and appears in the generated FlexNet-style log bracket.
 
 ## Return A License
 

@@ -11,7 +11,7 @@ def generate_output(
     include_feature_usage: bool = True,
 ) -> str:
     now = datetime.now(UTC)
-    vendors = _vendors(features)
+    feature_groups = _feature_groups(features)
     lines = [
         "lmstat - Copyright (c) 1989-2015 Flexera Software LLC. All Rights Reserved.",
         f"Flexible License Manager status on {_status_time(now)}",
@@ -23,42 +23,25 @@ def generate_output(
         "",
         f"Vendor daemon status (on {server}):",
     ]
-    lines.extend(f"    {vendor}: UP v11.19.5" for vendor in vendors)
 
     if not include_feature_usage:
+        lines.extend(f"    {vendor}: UP v11.19.5" for vendor, _ in feature_groups)
         return "\n".join(lines)
 
-    lines.append("Feature usage info:")
+    for group_index, (vendor, group_features) in enumerate(feature_groups):
+        if group_index:
+            lines.append("")
+        lines.append(f"    {vendor}: UP v11.19.5")
+        lines.append("Feature usage info:")
 
-    for feature in features:
-        name = feature.get("name")
-        total = feature.get("total", 0)
-        in_use = feature.get("in_use", 0)
-        issued_word = "license" if total == 1 else "licenses"
-        license_word = "license" if in_use == 1 else "licenses"
-        lines.append(
-            f"{_users_prefix(name)}(Total of {total} {issued_word} issued;  Total of {in_use} {license_word} in use)"
-        )
+        for feature in group_features:
+            lines.append(_usage_line(feature))
+            if include_details:
+                detail_lines = _feature_detail_lines(server, port, feature)
+                if detail_lines:
+                    lines.extend(detail_lines)
 
     if include_details:
-        for feature in features:
-            name = feature.get("name")
-            vendor = _vendor(feature)
-            expires_at = _expires_at(feature)
-            details = feature.get("details", [])
-            if not details:
-                continue
-            lines.extend(
-                [
-                    "",
-                    f'  "{name}" v1.0, vendor: {vendor}, expiry: {expires_at}',
-                    "  floating license",
-                    "",
-                ]
-            )
-            for detail in details:
-                lines.append(_detail_line(server, port, detail))
-
         lines.extend(["", *_note_lines(), "", *_inventory_lines(features)])
 
     return "\n".join(lines)
@@ -66,6 +49,35 @@ def generate_output(
 
 def _users_prefix(name: str) -> str:
     return f"Users of {name}:".ljust(30)
+
+
+def _usage_line(feature: dict) -> str:
+    name = feature.get("name")
+    total = feature.get("total", 0)
+    in_use = feature.get("in_use", 0)
+    issued_word = "license" if total == 1 else "licenses"
+    license_word = "license" if in_use == 1 else "licenses"
+    return (
+        f"{_users_prefix(name)}"
+        f"(Total of {total} {issued_word} issued;  Total of {in_use} {license_word} in use)"
+    )
+
+
+def _feature_detail_lines(server: str, port: int, feature: dict) -> list[str]:
+    name = feature.get("name")
+    vendor = _vendor(feature)
+    expires_at = _expires_at(feature)
+    details = feature.get("details", [])
+    if not details:
+        return []
+    lines = [
+        "",
+        f'  "{name}" v1.0, vendor: {vendor}, expiry: {expires_at}',
+        "  floating license",
+        "",
+    ]
+    lines.extend(_detail_line(server, port, detail) for detail in details)
+    return lines
 
 
 def _status_time(value: datetime) -> str:
@@ -76,15 +88,16 @@ def _vendor(feature: dict) -> str:
     return feature.get("daemon") or feature.get("vendor") or "default"
 
 
-def _vendors(features: list[dict]) -> list[str]:
-    vendors = []
-    seen = set()
+def _feature_groups(features: list[dict]) -> list[tuple[str, list[dict]]]:
+    groups: list[tuple[str, list[dict]]] = []
+    by_vendor: dict[str, list[dict]] = {}
     for feature in features:
         vendor = _vendor(feature)
-        if vendor not in seen:
-            vendors.append(vendor)
-            seen.add(vendor)
-    return vendors or ["default"]
+        if vendor not in by_vendor:
+            by_vendor[vendor] = []
+            groups.append((vendor, by_vendor[vendor]))
+        by_vendor[vendor].append(feature)
+    return groups or [("default", [])]
 
 
 def _note_lines() -> list[str]:

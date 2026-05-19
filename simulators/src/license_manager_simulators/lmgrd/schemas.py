@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from license_manager_simulators.core.models import CheckoutResult
 
@@ -11,6 +11,8 @@ class CheckoutRequest(BaseModel):
     user: str
     host: str
     pid: int
+    quantity: int = Field(default=1, ge=1)
+    info: str | None = None
 
 
 class ReturnRequest(BaseModel):
@@ -30,6 +32,7 @@ class OperationResponse(BaseModel):
     total: int
     in_use: int
     queued: int
+    quantity: int
 
     @classmethod
     def from_result(
@@ -46,4 +49,5 @@ class OperationResponse(BaseModel):
             total=result.total,
             in_use=result.in_use,
             queued=result.queued,
+            quantity=result.quantity,
         )

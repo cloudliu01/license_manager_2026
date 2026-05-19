@@ -20,15 +20,19 @@ def _service(features: dict[str, FeatureDef]) -> SimulatorService:
 
 
 def test_checkout_return_and_status_snapshot_update_in_realtime():
-    service = _service({"alpha": FeatureDef("alpha", 1, "default", date(2026, 11, 1))})
+    service = _service({"alpha": FeatureDef("alpha", 4, "default", date(2026, 11, 1))})
 
-    checkout = service.checkout("alpha", "user1", "host1", 101, request_id="r1")
+    checkout = service.checkout("alpha", "user1", "host1", 101, request_id="r1", quantity=3, info="info_APS_26")
     assert checkout.status == "GRANTED"
-    assert service.status()["features"][0]["in_use"] == 1
+    assert checkout.quantity == 3
+    assert service.status()["features"][0]["in_use"] == 3
     assert service.status()["features"][0]["expires_at"] == "2026-11-01"
+    assert service.debug_checkouts(status="GRANTED")[0]["quantity"] == 3
+    assert service.debug_checkouts(status="GRANTED")[0]["info"] == "info_APS_26"
 
     returned = service.return_checkout(checkout.checkout_id, request_id="r2")
     assert returned.status == "RETURNED"
+    assert returned.quantity == 3
     assert service.status()["features"][0]["in_use"] == 0
 
 
@@ -90,3 +94,17 @@ def test_unknown_and_expired_features_are_rejected_and_logged():
     assert expired.status == "REJECTED"
     assert expired.reason == "FEATURE_EXPIRED"
     assert service.status()["counters"]["rejected"] == 2
+
+
+def test_checkout_quantity_over_total_is_denied_and_logged():
+    service = _service({"alpha": FeatureDef("alpha", 2, "default", None)})
+
+    rejected = service.checkout(
+        "alpha", "user1", "host1", 101, request_id="r1", quantity=4, info="info_APS_26"
+    )
+
+    assert rejected.status == "REJECTED"
+    assert rejected.reason == "LICENSE_LIMIT_REACHED"
+    assert rejected.quantity == 4
+    assert service.status()["features"][0]["in_use"] == 0
+    assert 'DENIED:\t"alpha"\tuser1@host1\t[info_APS_26]' in "\n".join(service.log_writer.lines)

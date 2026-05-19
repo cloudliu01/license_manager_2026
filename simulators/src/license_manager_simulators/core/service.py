@@ -52,19 +52,30 @@ class SimulatorService:
             "counters": self.store.counters(),
         }
 
-    def checkout(self, feature_name: str, user: str, host: str, pid: int, request_id: str | None = None) -> CheckoutResult:
+    def checkout(
+        self,
+        feature_name: str,
+        user: str,
+        host: str,
+        pid: int,
+        request_id: str | None = None,
+        quantity: int = 1,
+        info: str | None = None,
+    ) -> CheckoutResult:
         with self._lock:
             now = datetime.now(UTC)
+            if quantity < 1:
+                raise ValueError("INVALID_QUANTITY")
             if request_id:
                 cached = self.store.cache_get(request_id, "checkout")
                 if cached:
                     return CheckoutResult(**cached)
             feature = self.store.get_feature(feature_name)
             if feature is None:
-                result = CheckoutResult("REJECTED", "UNKNOWN_FEATURE", None, feature_name, "default", 0, 0, 0)
+                result = CheckoutResult("REJECTED", "UNKNOWN_FEATURE", None, feature_name, "default", 0, 0, 0, quantity)
                 self.store.event("REJECTED_CHECKOUT", result.__dict__, now)
                 self.store.cache_set(request_id, "checkout", result.__dict__, now)
-                self.log_writer.denied("default", feature_name, user, host, "UNKNOWN_FEATURE")
+                self.log_writer.unsupported("default", feature_name, user, host, info)
                 return result
 
             expires_at = date.fromisoformat(feature["expires_at"]) if feature["expires_at"] else None
@@ -78,15 +89,45 @@ class SimulatorService:
                     feature["total"],
                     feature["in_use"],
                     self.store.queue_count(feature_name, feature["daemon"]),
+                    quantity,
                 )
                 self.store.event("REJECTED_CHECKOUT", result.__dict__, now)
                 self.store.cache_set(request_id, "checkout", result.__dict__, now)
-                self.log_writer.denied(feature["daemon"], feature_name, user, host, "FEATURE_EXPIRED")
+                self.log_writer.denied(feature["daemon"], feature_name, user, host, "FEATURE_EXPIRED", info)
                 return result
 
-            if feature["in_use"] < feature["total"]:
+            if quantity > feature["total"]:
+                result = CheckoutResult(
+                    "REJECTED",
+                    "LICENSE_LIMIT_REACHED",
+                    None,
+                    feature_name,
+                    feature["daemon"],
+                    feature["total"],
+                    feature["in_use"],
+                    self.store.queue_count(feature_name, feature["daemon"]),
+                    quantity,
+                )
+                self.store.event("REJECTED_CHECKOUT", result.__dict__, now)
+                self.store.cache_set(request_id, "checkout", result.__dict__, now)
+                self.log_writer.denied(feature["daemon"], feature_name, user, host, "LICENSE_LIMIT_REACHED", info)
+                return result
+
+            if feature["in_use"] + quantity <= feature["total"]:
                 checkout_id = str(uuid4())
-                self.store.add_checkout(checkout_id, feature_name, feature["daemon"], user, host, pid, "GRANTED", now, now)
+                self.store.add_checkout(
+                    checkout_id,
+                    feature_name,
+                    feature["daemon"],
+                    user,
+                    host,
+                    pid,
+                    quantity,
+                    info,
+                    "GRANTED",
+                    now,
+                    now,
+                )
                 current = self.store.get_feature(feature_name)
                 result = CheckoutResult(
                     "GRANTED",
@@ -97,20 +138,31 @@ class SimulatorService:
                     feature["total"],
                     current["in_use"],
                     self.store.queue_count(feature_name, feature["daemon"]),
+                    quantity,
                 )
                 self.store.event("GRANTED_CHECKOUT", result.__dict__, now)
                 self.store.cache_set(request_id, "checkout", result.__dict__, now)
-                self.log_writer.checkout_granted(feature["daemon"], feature_name, user, host, pid, checkout_id)
+                self.log_writer.checkout_granted(
+                    feature["daemon"], feature_name, user, host, pid, checkout_id, quantity, info
+                )
                 return result
 
             queued_count = self.store.queue_count(feature_name, feature["daemon"])
             if queued_count >= 100:
                 result = CheckoutResult(
-                    "REJECTED", "QUEUE_FULL", None, feature_name, feature["daemon"], feature["total"], feature["in_use"], queued_count
+                    "REJECTED",
+                    "QUEUE_FULL",
+                    None,
+                    feature_name,
+                    feature["daemon"],
+                    feature["total"],
+                    feature["in_use"],
+                    queued_count,
+                    quantity,
                 )
                 self.store.event("REJECTED_CHECKOUT", result.__dict__, now)
                 self.store.cache_set(request_id, "checkout", result.__dict__, now)
-                self.log_writer.denied(feature["daemon"], feature_name, user, host, "QUEUE_FULL")
+                self.log_writer.denied(feature["daemon"], feature_name, user, host, "QUEUE_FULL", info)
                 return result
 
             checkout_id = str(uuid4())
@@ -122,11 +174,21 @@ class SimulatorService:
                 user,
                 host,
                 pid,
+                quantity,
+                info,
                 now,
                 position,
             )
             result = CheckoutResult(
-                "QUEUED", None, checkout_id, feature_name, feature["daemon"], feature["total"], feature["in_use"], queued_count + 1
+                "QUEUED",
+                None,
+                checkout_id,
+                feature_name,
+                feature["daemon"],
+                feature["total"],
+                feature["in_use"],
+                queued_count + 1,
+                quantity,
             )
             self.store.event("QUEUED_CHECKOUT", result.__dict__, now)
             self.store.cache_set(request_id, "checkout", result.__dict__, now)
@@ -157,6 +219,7 @@ class SimulatorService:
                     feature["total"] if feature else 0,
                     feature["in_use"] if feature else 0,
                     self.store.queue_count(record.feature, record.daemon),
+                    record.quantity,
                 )
                 self.store.event("REJECTED_RETURN", result.__dict__, now)
                 self.store.cache_set(request_id, "return", result.__dict__, now)
@@ -174,17 +237,34 @@ class SimulatorService:
                     feature["total"] if feature else 0,
                     feature["in_use"] if feature else 0,
                     self.store.queue_count(record.feature, record.daemon),
+                    record.quantity,
                 )
                 self.store.event("RETURNED_CHECKOUT", result.__dict__, now)
                 self.store.cache_set(request_id, "return", result.__dict__, now)
                 return result
 
             granted = self.store.return_granted_and_promote_next(record, now)
-            self.log_writer.returned(record.daemon, record.feature, record.user, record.host, record.pid, record.checkout_id)
+            self.log_writer.returned(
+                record.daemon,
+                record.feature,
+                record.user,
+                record.host,
+                record.pid,
+                record.checkout_id,
+                record.quantity,
+                record.info,
+            )
             feature = self.store.get_feature(record.feature)
             if granted:
                 self.log_writer.checkout_granted(
-                    granted.daemon, granted.feature, granted.user, granted.host, granted.pid, granted.checkout_id
+                    granted.daemon,
+                    granted.feature,
+                    granted.user,
+                    granted.host,
+                    granted.pid,
+                    granted.checkout_id,
+                    granted.quantity,
+                    granted.info,
                 )
                 feature = self.store.get_feature(record.feature)
             result = CheckoutResult(
@@ -196,6 +276,7 @@ class SimulatorService:
                 feature["total"] if feature else 0,
                 feature["in_use"] if feature else 0,
                 self.store.queue_count(record.feature, record.daemon),
+                record.quantity,
             )
             self.store.event("RETURNED_CHECKOUT", result.__dict__, now)
             self.store.cache_set(request_id, "return", result.__dict__, now)
