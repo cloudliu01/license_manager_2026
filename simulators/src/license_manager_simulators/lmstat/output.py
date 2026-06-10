@@ -68,7 +68,8 @@ def _feature_detail_lines(server: str, port: int, feature: dict) -> list[str]:
     vendor = _vendor(feature)
     expires_at = _expires_at(feature)
     details = feature.get("details", [])
-    if not details:
+    reservation_lines = _reservation_lines(feature)
+    if not details and not reservation_lines:
         return []
     lines = [
         "",
@@ -77,6 +78,20 @@ def _feature_detail_lines(server: str, port: int, feature: dict) -> list[str]:
         "",
     ]
     lines.extend(_detail_line(server, port, detail) for detail in details)
+    lines.extend(reservation_lines)
+    return lines
+
+
+def _reservation_lines(feature: dict) -> list[str]:
+    lines = []
+    for reservation in feature.get("reservations", []):
+        count = int(reservation.get("count", 0))
+        if count < 1:
+            continue
+        kind = str(reservation.get("kind", "")).upper()
+        name = reservation.get("name")
+        license_word = "license" if count == 1 else "licenses"
+        lines.append(f"    {count} {license_word} for {kind} {name}")
     return lines
 
 

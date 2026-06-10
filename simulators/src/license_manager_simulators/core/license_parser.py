@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+import re
 from datetime import date
 
-from .models import FeatureDef, LicenseConfig
+from .models import FeatureDef, LicenseConfig, ReservationDef
 
 
 def parse_license_text(text: str) -> LicenseConfig:
@@ -51,6 +52,7 @@ def parse_license_text(text: str) -> LicenseConfig:
                 raise ValueError("FEATURE total must be >= 0")
             daemon_name = "default"
             expires_at: date | None = None
+            reservations: list[ReservationDef] = []
             idx = 3
             while idx < len(parts):
                 token = parts[idx].upper()
@@ -67,11 +69,26 @@ def parse_license_text(text: str) -> LicenseConfig:
                     expires_at = date(int(year), int(month), int(day))
                     idx += 2
                     continue
+                if token == "RESERVE":
+                    if idx + 3 >= len(parts):
+                        raise ValueError("RESERVE requires count, kind, and name")
+                    count = int(parts[idx + 1])
+                    if count < 1:
+                        raise ValueError("RESERVE count must be >= 1")
+                    kind = parts[idx + 2].upper()
+                    if kind not in {"GROUP", "HOST_GROUP", "HOST"}:
+                        raise ValueError("RESERVE kind must be GROUP, HOST_GROUP, or HOST")
+                    reservation_name = parts[idx + 3]
+                    if not re.fullmatch(r"[A-Za-z0-9_]+", reservation_name):
+                        raise ValueError("RESERVE name must contain only letters, numbers, and underscores")
+                    reservations.append(ReservationDef(kind, reservation_name, count))
+                    idx += 4
+                    continue
                 raise ValueError(f"Unknown FEATURE token: {parts[idx]}")
 
             if daemon_name != "default" and daemon_name not in daemons:
                 raise ValueError("FEATURE references unknown daemon")
-            features[name] = FeatureDef(name, total, daemon_name, expires_at)
+            features[name] = FeatureDef(name, total, daemon_name, expires_at, tuple(reservations))
             continue
 
         raise ValueError(f"Unknown keyword: {parts[0]}")

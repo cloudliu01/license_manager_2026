@@ -1,0 +1,3 @@
+[submodule "third_party/flexlm_exporter"]
+	path = third_party/flexlm_exporter
+	url = https://github.com/mjtrangoni/flexlm_exporter.git

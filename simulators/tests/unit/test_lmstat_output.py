@@ -155,3 +155,40 @@ def test_generate_output_without_feature_usage_only_shows_header_and_daemons():
     assert "Feature usage info:" not in content
     assert "Users of alpha:" not in content
     assert "NOTE: lmstat -i" not in content
+
+
+def test_generate_output_includes_reservation_lines_for_exporter():
+    content = generate_output(
+        server="127.0.0.1",
+        port=27000,
+        features=[
+            {
+                "name": "alpha",
+                "daemon": "vendorA",
+                "total": 4,
+                "in_use": 1,
+                "queued": 0,
+                "expired": False,
+                "expires_at": "2026-11-01",
+                "reservations": [
+                    {"kind": "GROUP", "name": "engineering", "count": 2},
+                    {"kind": "HOST", "name": "buildhost1", "count": 1},
+                ],
+                "details": [
+                    {
+                        "checkout_id": "co-1",
+                        "user": "user1",
+                        "host": "host1",
+                        "pid": 101,
+                        "status": "GRANTED",
+                        "granted_at": "2026-05-07T00:00:00+00:00",
+                    }
+                ],
+            }
+        ],
+        include_details=True,
+    )
+
+    assert "2 licenses for GROUP engineering" in content
+    assert "1 license for HOST buildhost1" in content
+    assert content.index("Users of alpha:") < content.index("2 licenses for GROUP engineering")

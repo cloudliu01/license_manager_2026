@@ -55,6 +55,7 @@ def main() -> int:
                 "queued": item.get("queued", 0),
                 "expired": item.get("expired", False),
                 "expires_at": item.get("expires_at"),
+                "reservations": item.get("reservations", []),
                 "details": by_feature.get(feature_name, []),
             }
         )

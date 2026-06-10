@@ -141,6 +141,39 @@ def test_lmstat_groups_feature_usage_under_each_vendor_daemon(tmp_path):
             proc.kill()
 
 
+def test_lmstat_outputs_reservations_from_license_file(tmp_path):
+    port = _free_port()
+    root = Path(__file__).resolve().parents[2]
+    lmgrd = root / "wrappers" / "lmgrd"
+    lmstat = root / "wrappers" / "lmstat"
+    license_path = tmp_path / "license.dat"
+    log_path = tmp_path / "license.log"
+    license_path.write_text(
+        f"PORT {port}\nDAEMON vendorA\n"
+        "FEATURE alpha 2 DAEMON vendorA EXP 2026-11-01 RESERVE 2 GROUP engineering RESERVE 1 HOST buildhost1\n",
+        encoding="utf-8",
+    )
+
+    proc = subprocess.Popen([str(lmgrd), "-c", str(license_path), "-l", str(log_path)])
+    try:
+        _wait_for_health(port)
+        result = subprocess.run(
+            [str(lmstat), "-c", f"{port}@127.0.0.1", "-a", "-i"],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+        assert "2 licenses for GROUP engineering" in result.stdout
+        assert "1 license for HOST buildhost1" in result.stdout
+    finally:
+        proc.send_signal(signal.SIGTERM)
+        try:
+            proc.wait(timeout=3)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+
+
 def test_lmstat_details_exclude_returned_checkouts_after_queue_promotion(tmp_path):
     port = _free_port()
     root = Path(__file__).resolve().parents[2]

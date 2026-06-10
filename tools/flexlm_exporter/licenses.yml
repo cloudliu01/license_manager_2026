@@ -1,0 +1,6 @@
+licenses:
+  - name: simulator
+    license_server: 27000@127.0.0.1
+    monitor_users: true
+    monitor_reservations: true
+    monitor_versions: true

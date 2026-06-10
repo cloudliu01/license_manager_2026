@@ -5,11 +5,19 @@ from datetime import date, datetime
 
 
 @dataclass(frozen=True)
+class ReservationDef:
+    kind: str
+    name: str
+    count: int
+
+
+@dataclass(frozen=True)
 class FeatureDef:
     name: str
     total: int
     daemon: str
     expires_at: date | None
+    reservations: tuple[ReservationDef, ...] = ()
 
 
 @dataclass(frozen=True)

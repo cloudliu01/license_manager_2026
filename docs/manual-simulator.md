@@ -24,6 +24,11 @@ Supported license-file lines:
 - `DAEMON <name>`: optional vendor daemon name.
 - `FEATURE <name> <total>`: feature name and license count.
 - `FEATURE <name> <total> DAEMON <daemon> EXP <YYYY-MM-DD>`: optional daemon and expiration. `lmstat -i` renders expiration as `DD-Mon-YYYY`, for example `01-Nov-2026`.
+- `FEATURE <name> <total> RESERVE <count> GROUP <group>`: optional reservation metadata emitted in `lmstat -a -i` output for exporter compatibility.
+- `FEATURE <name> <total> RESERVE <count> HOST_GROUP <group>`: optional host-group reservation metadata emitted in `lmstat -a -i` output for exporter compatibility.
+- `FEATURE <name> <total> RESERVE <count> HOST <host>`: optional host reservation metadata emitted in `lmstat -a -i` output for exporter compatibility.
+
+Reservation names must contain only letters, numbers, and underscores for exporter compatibility.
 
 ## Start lmgrd
 

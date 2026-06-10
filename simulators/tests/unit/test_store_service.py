@@ -1,7 +1,7 @@
 from datetime import UTC, date, datetime
 
 from license_manager_simulators.core.log_writer import MemoryLogWriter
-from license_manager_simulators.core.models import FeatureDef, LicenseConfig
+from license_manager_simulators.core.models import FeatureDef, LicenseConfig, ReservationDef
 from license_manager_simulators.core.service import SimulatorService
 from license_manager_simulators.core.store import SimulatorStore
 
@@ -34,6 +34,29 @@ def test_checkout_return_and_status_snapshot_update_in_realtime():
     assert returned.status == "RETURNED"
     assert returned.quantity == 3
     assert service.status()["features"][0]["in_use"] == 0
+
+
+def test_status_snapshot_includes_feature_reservations():
+    service = _service(
+        {
+            "alpha": FeatureDef(
+                "alpha",
+                4,
+                "default",
+                None,
+                (
+                    ReservationDef("GROUP", "engineering", 2),
+                    ReservationDef("HOST", "buildhost1", 1),
+                ),
+            )
+        }
+    )
+
+    feature = service.status()["features"][0]
+    assert feature["reservations"] == [
+        {"kind": "GROUP", "name": "engineering", "count": 2},
+        {"kind": "HOST", "name": "buildhost1", "count": 1},
+    ]
 
 
 def test_queue_counts_are_per_feature_and_dequeue_same_feature_only():

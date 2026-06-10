@@ -55,6 +55,16 @@ class SimulatorStore:
         )
         cursor.execute(
             """
+            create table reservations (
+                feature text not null,
+                kind text not null,
+                name text not null,
+                count integer not null
+            )
+            """
+        )
+        cursor.execute(
+            """
             create table queue (
                 queue_id text primary key,
                 checkout_id text not null,
@@ -100,6 +110,13 @@ class SimulatorStore:
                 feature.total,
                 feature.expires_at.isoformat() if feature.expires_at else None,
             ),
+        )
+        self.conn.executemany(
+            "insert into reservations values (?, ?, ?, ?)",
+            [
+                (feature.name, reservation.kind, reservation.name, reservation.count)
+                for reservation in feature.reservations
+            ],
         )
         self.conn.commit()
 
@@ -323,9 +340,17 @@ class SimulatorStore:
                     "queued": self.queue_count(row["name"], row["daemon"]),
                     "expired": bool(expires_at and expires_at < today),
                     "expires_at": expires_at.isoformat() if expires_at else None,
+                    "reservations": self.reservation_rows(row["name"]),
                 }
             )
         return items
+
+    def reservation_rows(self, feature: str) -> list[dict]:
+        rows = self.conn.execute(
+            "select kind, name, count from reservations where feature = ? order by rowid",
+            (feature,),
+        ).fetchall()
+        return [_row_to_dict(row) for row in rows]
 
     def debug_checkouts(self, limit: int = 100, feature: str | None = None, daemon: str | None = None, status: str | None = None) -> list[dict]:
         query = "select * from checkouts where 1 = 1"
