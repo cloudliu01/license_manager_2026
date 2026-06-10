@@ -15,6 +15,7 @@ The simulator is CLI-compatible for the workflows below, but it does not impleme
 - [Manual simulator usage](docs/manual-simulator.md): start `lmgrd`, check out and return licenses from the command line, and print usage with `lmstat`.
 - [Workload simulator usage](docs/workload-simulator.md): generate synthetic activity, validate runs, inspect `samples.sqlite`, and query raw `lmstat` snapshots.
 - [Flexlm exporter verification](docs/flexlm-exporter-simulator.md): build `flexlm_exporter`, run it through the local `lmutil` shim, and verify simulator metrics.
+- [Docker observability stack](docker/README.md): run simulator, `flexlm_exporter`, Prometheus, and Grafana locally.
 
 ## Requirements
 

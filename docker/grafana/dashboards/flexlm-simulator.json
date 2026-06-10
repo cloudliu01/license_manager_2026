@@ -1,0 +1,71 @@
+{
+  "annotations": {"list": []},
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "links": [],
+  "panels": [
+    {
+      "datasource": {"type": "prometheus", "uid": "Prometheus"},
+      "fieldConfig": {"defaults": {}, "overrides": []},
+      "gridPos": {"h": 4, "w": 6, "x": 0, "y": 0},
+      "id": 1,
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}},
+      "targets": [{"expr": "flexlm_server_status", "legendFormat": "{{app}} {{fqdn}}:{{port}}"}],
+      "title": "Server Status",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "Prometheus"},
+      "fieldConfig": {"defaults": {}, "overrides": []},
+      "gridPos": {"h": 8, "w": 12, "x": 6, "y": 0},
+      "id": 2,
+      "targets": [
+        {"expr": "flexlm_feature_issued", "legendFormat": "issued {{name}}"},
+        {"expr": "flexlm_feature_used", "legendFormat": "used {{name}}"}
+      ],
+      "title": "Feature Issued vs Used",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "Prometheus"},
+      "fieldConfig": {"defaults": {}, "overrides": []},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+      "id": 3,
+      "targets": [
+        {"expr": "flexlm_feature_reserved_groups", "legendFormat": "group {{group}} {{name}}"},
+        {"expr": "flexlm_feature_reserved_host", "legendFormat": "host {{host}} {{name}}"}
+      ],
+      "title": "Reservations",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "Prometheus"},
+      "fieldConfig": {"defaults": {}, "overrides": []},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+      "id": 4,
+      "targets": [{"expr": "flexlm_feature_used_users", "legendFormat": "{{name}} {{user}} {{version}}"}],
+      "title": "User Usage By Version",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "Prometheus"},
+      "fieldConfig": {"defaults": {}, "overrides": []},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16},
+      "id": 5,
+      "targets": [{"expr": "flexlm_feature_expiration_seconds", "legendFormat": "{{name}} {{version}}"}],
+      "title": "Feature Expiration Seconds",
+      "type": "timeseries"
+    }
+  ],
+  "refresh": "5s",
+  "schemaVersion": 41,
+  "tags": ["flexlm", "simulator"],
+  "templating": {"list": []},
+  "time": {"from": "now-15m", "to": "now"},
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "FlexLM Simulator",
+  "uid": "flexlm-simulator",
+  "version": 1
+}

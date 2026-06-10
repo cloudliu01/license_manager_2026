@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [[ $# -lt 1 ]]; then
+  printf 'usage: lmutil lmstat [args]\n' >&2
+  exit 2
+fi
+
+subcommand="$1"
+shift
+
+if [[ "${subcommand}" != "lmstat" ]]; then
+  printf 'unsupported lmutil subcommand: %s\n' "${subcommand}" >&2
+  exit 2
+fi
+
+if [[ "${1:-}" == "-v" ]]; then
+  printf 'lmstat v11.19.5 build 300000 x64_lsb\n'
+  exit 0
+fi
+
+args=("$@")
+has_a=0
+has_i=0
+for arg in "${args[@]}"; do
+  [[ "${arg}" == "-a" ]] && has_a=1
+  [[ "${arg}" == "-i" ]] && has_i=1
+done
+
+if [[ ${has_a} -eq 1 && ${has_i} -eq 0 ]]; then
+  args+=("-i")
+elif [[ ${has_a} -eq 0 && ${has_i} -eq 1 ]]; then
+  args+=("-a")
+fi
+
+exec /app/simulators/wrappers/lmstat "${args[@]}"

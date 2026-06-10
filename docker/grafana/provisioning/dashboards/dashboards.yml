@@ -1,0 +1,11 @@
+apiVersion: 1
+
+providers:
+  - name: FlexLM
+    orgId: 1
+    folder: License Manager
+    type: file
+    disableDeletion: false
+    editable: true
+    options:
+      path: /var/lib/grafana/dashboards
