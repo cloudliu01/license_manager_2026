@@ -31,6 +31,7 @@ class SimulatorStore:
                 daemon text not null,
                 total integer not null,
                 in_use integer not null,
+                denied_count integer not null default 0,
                 expires_at text
             )
             """
@@ -103,7 +104,7 @@ class SimulatorStore:
 
     def insert_feature(self, feature: FeatureDef) -> None:
         self.conn.execute(
-            "insert into features values (?, ?, ?, 0, ?)",
+            "insert into features values (?, ?, ?, 0, 0, ?)",
             (
                 feature.name,
                 feature.daemon,
@@ -117,6 +118,13 @@ class SimulatorStore:
                 (feature.name, reservation.kind, reservation.name, reservation.count)
                 for reservation in feature.reservations
             ],
+        )
+        self.conn.commit()
+
+    def increment_denied(self, feature: str) -> None:
+        self.conn.execute(
+            "update features set denied_count = denied_count + 1 where name = ?",
+            (feature,),
         )
         self.conn.commit()
 
@@ -331,12 +339,17 @@ class SimulatorStore:
         today = date.today()
         for row in rows:
             expires_at = date.fromisoformat(row["expires_at"]) if row["expires_at"] else None
+            in_use = row["in_use"]
+            total = row["total"]
+            denied_count = row["denied_count"] if "denied_count" in row.keys() else 0
             items.append(
                 {
                     "feature": row["name"],
                     "daemon": row["daemon"],
-                    "total": row["total"],
-                    "in_use": row["in_use"],
+                    "total": total,
+                    "in_use": in_use,
+                    "available": max(total - in_use, 0),
+                    "denied": denied_count,
                     "queued": self.queue_count(row["name"], row["daemon"]),
                     "expired": bool(expires_at and expires_at < today),
                     "expires_at": expires_at.isoformat() if expires_at else None,

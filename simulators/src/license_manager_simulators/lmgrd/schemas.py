@@ -13,6 +13,7 @@ class CheckoutRequest(BaseModel):
     pid: int
     quantity: int = Field(default=1, ge=1)
     info: str | None = None
+    allow_queue: bool = True
 
 
 class ReturnRequest(BaseModel):

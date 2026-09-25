@@ -61,6 +61,7 @@ class SimulatorService:
         request_id: str | None = None,
         quantity: int = 1,
         info: str | None = None,
+        allow_queue: bool = True,
     ) -> CheckoutResult:
         with self._lock:
             now = datetime.now(UTC)
@@ -80,6 +81,7 @@ class SimulatorService:
 
             expires_at = date.fromisoformat(feature["expires_at"]) if feature["expires_at"] else None
             if expires_at and expires_at < date.today():
+                self.store.increment_denied(feature_name)
                 result = CheckoutResult(
                     "REJECTED",
                     "FEATURE_EXPIRED",
@@ -97,6 +99,7 @@ class SimulatorService:
                 return result
 
             if quantity > feature["total"]:
+                self.store.increment_denied(feature_name)
                 result = CheckoutResult(
                     "REJECTED",
                     "LICENSE_LIMIT_REACHED",
@@ -147,8 +150,27 @@ class SimulatorService:
                 )
                 return result
 
+            if not allow_queue:
+                self.store.increment_denied(feature_name)
+                result = CheckoutResult(
+                    "DENIED",
+                    "LICENSE_LIMIT_REACHED",
+                    None,
+                    feature_name,
+                    feature["daemon"],
+                    feature["total"],
+                    feature["in_use"],
+                    self.store.queue_count(feature_name, feature["daemon"]),
+                    quantity,
+                )
+                self.store.event("DENIED_CHECKOUT", result.__dict__, now)
+                self.store.cache_set(request_id, "checkout", result.__dict__, now)
+                self.log_writer.denied(feature["daemon"], feature_name, user, host, "LICENSE_LIMIT_REACHED", info)
+                return result
+
             queued_count = self.store.queue_count(feature_name, feature["daemon"])
             if queued_count >= 100:
+                self.store.increment_denied(feature_name)
                 result = CheckoutResult(
                     "REJECTED",
                     "QUEUE_FULL",

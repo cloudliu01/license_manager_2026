@@ -39,6 +39,7 @@ def create_app(service: SimulatorService) -> FastAPI:
                 request_id=request_id,
                 quantity=payload.quantity,
                 info=payload.info,
+                allow_queue=payload.allow_queue,
             )
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -52,6 +53,10 @@ def create_app(service: SimulatorService) -> FastAPI:
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         return _result_response(result, request_id)
+
+    @app.post("/v1/checkin")
+    def checkin(payload: ReturnRequest) -> dict:
+        return return_checkout(payload)
 
     @app.get("/v1/debug/checkouts")
     def debug_checkouts(

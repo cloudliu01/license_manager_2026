@@ -1,0 +1,27 @@
+# ==============================================================================
+# Dummy License Configuration for lmgrd Simulator
+# ==============================================================================
+PORT 27000
+SERVER_NAME eda_license_server
+
+# Vendor Daemons
+DAEMON synopsys_sim
+DAEMON cadence_sim
+
+# Dummy Features:
+# FEATURE <name> <total> [DAEMON <daemon>] [EXP <YYYY-MM-DD>] [RESERVE <count> <kind> <name>]
+
+# 1. 编译工具: 5个席位, 属于 synopsys_sim, 2028年底过期
+FEATURE VCS_Compiler 5 DAEMON synopsys_sim EXP 2028-12-31
+
+# 2. 综合工具: 10个席位, 属于 synopsys_sim, 永久(远期)有效
+FEATURE Design_Compiler 10 DAEMON synopsys_sim EXP 2030-01-01
+
+# 3. 版图绘制工具: 2个席位, 属于 cadence_sim, 永久(远期)有效
+FEATURE Virtuoso_Layout 2 DAEMON cadence_sim EXP 2030-01-01
+
+# 4. 形式验证工具: 4个席位, 带预留规则
+FEATURE Formal_Verifier 4 DAEMON synopsys_sim EXP 2028-12-31 RESERVE 1 GROUP core_team
+
+# 5. 已过期工具 (用于验证 FEATURE_EXPIRED 拒绝场景)
+FEATURE Legacy_Simulator 1 DAEMON cadence_sim EXP 2020-01-01
