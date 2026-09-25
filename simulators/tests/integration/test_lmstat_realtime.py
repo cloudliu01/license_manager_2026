@@ -36,10 +36,22 @@ def test_lmstat_retrieves_realtime_usage_and_lmgrd_appends_activity_log(tmp_path
         assert "[Detecting lmgrd processes...]" not in result.stdout
         assert "Feature usage info:" in result.stdout
         assert "NOTE: lmstat -i does not give information from the server," in result.stdout
-        assert "Users of alpha:               (Total of 1 license issued;  Total of 1 license in use)" in result.stdout
-        assert '  "alpha" v1.0, vendor: default, expiry: 01-Nov-2026' in result.stdout
-        assert "alpha                           1.0         1           01-Nov-2026  default" in result.stdout
+        assert "Users of alpha:  (Total of 1 license issued;  Total of 1 license in use)" in result.stdout
+        assert '  "alpha" v1.0, vendor: default, expiry: 01-nov-2026' in result.stdout
+        assert "alpha                           1.0         1           01-nov-2026  default" in result.stdout
         assert '"user1" host1 /dev/pts/101' in result.stdout
+
+        # -a, without -i, must still include per-user checkout rows.
+        all_output = subprocess.run(
+            [str(lmstat), "-c", f"{port}@127.0.0.1", "-a"],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout
+        assert "Users of alpha:" in all_output
+        assert '"user1" host1 /dev/pts/101' in all_output
+        assert "NOTE: lmstat -i" not in all_output
+        assert "Feature                         Version" not in all_output
 
         _post_json(port, "/v1/return", {"request_id": "r2", "checkout_id": checkout["checkout_id"]})
         result = subprocess.run(
@@ -48,7 +60,7 @@ def test_lmstat_retrieves_realtime_usage_and_lmgrd_appends_activity_log(tmp_path
             capture_output=True,
             text=True,
         )
-        assert "Users of alpha:               (Total of 1 license issued;  Total of 0 licenses in use)" in result.stdout
+        assert "Users of alpha:  (Total of 1 license issued;  Total of 0 licenses in use)" in result.stdout
 
         content = log_path.read_text(encoding="utf-8")
         assert 'OUT:\t"alpha"\tuser1@host1' in content
@@ -90,6 +102,18 @@ def test_lmstat_without_feature_flags_shows_header_and_daemon_status_only(tmp_pa
         assert "Feature usage info:" not in result.stdout
         assert "Users of alpha:" not in result.stdout
         assert "NOTE: lmstat -i" not in result.stdout
+
+        inventory = subprocess.run(
+            [str(lmstat), "-c", f"{port}@127.0.0.1", "-i"],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout
+        assert "Vendor daemon status (on 127.0.0.1):" in inventory
+        assert "Feature usage info:" not in inventory
+        assert "NOTE: lmstat -i does not give information from the server," in inventory
+        assert "Feature                         Version     #licenses    Expires      Vendor" in inventory
+        assert "alpha                           1.0" in inventory
     finally:
         proc.send_signal(signal.SIGTERM)
         try:
@@ -130,7 +154,7 @@ def test_lmstat_groups_feature_usage_under_each_vendor_daemon(tmp_path):
         output = result.stdout
         assert output.index("    d1lmd: UP") < output.index("Users of alpha:")
         assert output.index("Users of alpha:") < output.index('  "alpha" v1.0, vendor: d1lmd')
-        assert output.index('    "user1" host1') < output.index("    d2lmd: UP")
+        assert output.index("    d2lmd: UP") < output.index('    "user1" host1')
         assert output.index("    d2lmd: UP") < output.index("Users of beta:")
         assert output.index("Users of beta:") < output.index("NOTE: lmstat -i")
     finally:
@@ -205,7 +229,7 @@ def test_lmstat_details_exclude_returned_checkouts_after_queue_promotion(tmp_pat
             text=True,
         )
 
-        assert "Users of alpha:               (Total of 1 license issued;  Total of 1 license in use)" in result.stdout
+        assert "Users of alpha:  (Total of 1 license issued;  Total of 1 license in use)" in result.stdout
         assert '"active_user" host2 /dev/pts/102' in result.stdout
         assert '"returned_user" host1 /dev/pts/101' not in result.stdout
     finally:

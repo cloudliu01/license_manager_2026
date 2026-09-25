@@ -47,21 +47,21 @@ def test_generate_output_includes_details_for_verbose_mode():
     assert "Vendor daemon status (on 127.0.0.1):" in content
     assert "    vendorA: UP v11.19.5" in content
     assert "    vendorB: UP v11.19.5" in content
-    assert content.count("Feature usage info:") == 2
-    assert "Users of alpha:               (Total of 2 licenses issued;  Total of 1 license in use)" in content
-    assert "Users of beta:                (Total of 4 licenses issued;  Total of 0 licenses in use)" in content
+    assert content.count("Feature usage info:") == 1
+    assert "Users of alpha:  (Total of 2 licenses issued;  Total of 1 license in use)" in content
+    assert "Users of beta:  (Total of 4 licenses issued;  Total of 0 licenses in use)" in content
     assert "NOTE: lmstat -i does not give information from the server," in content
     assert "      but only reads the license file.  For this reason," in content
     assert "      lmstat -a is recommended instead." in content
     assert "Feature                         Version     #licenses    Expires      Vendor" in content
-    assert "alpha                           1.0         2           01-Nov-2026  vendorA" in content
+    assert "alpha                           1.0         2           01-nov-2026  vendorA" in content
     assert "beta                            1.0         4           permanent    vendorB" in content
-    assert '  "alpha" v1.0, vendor: vendorA, expiry: 01-Nov-2026' in content
+    assert '  "alpha" v1.0, vendor: vendorA, expiry: 01-nov-2026' in content
     assert "  floating license" in content
     assert '    "user1" host1 /dev/pts/101 (v1.0) (127.0.0.1/27000 101), start ' in content
     assert content.index("    vendorA: UP") < content.index("Users of alpha:")
     assert content.index("Users of alpha:") < content.index('  "alpha" v1.0, vendor: vendorA')
-    assert content.index('    "user1" host1') < content.index("    vendorB: UP")
+    assert content.index("    vendorB: UP") < content.index('    "user1" host1')
     assert content.index("    vendorB: UP") < content.index("Users of beta:")
     assert content.index('  "alpha" v1.0, vendor: vendorA') < content.index("NOTE: lmstat -i")
     assert content.index("NOTE: lmstat -i") < content.index("Feature                         Version")
@@ -115,7 +115,7 @@ def test_generate_output_omits_i_note_without_inventory_flag():
         include_details=False,
     )
 
-    assert "Users of alpha:               (Total of 1 license issued;  Total of 0 licenses in use)" in content
+    assert "Users of alpha:  (Total of 1 license issued;  Total of 0 licenses in use)" in content
     assert "NOTE: lmstat -i" not in content
     assert "Feature                         Version" not in content
 

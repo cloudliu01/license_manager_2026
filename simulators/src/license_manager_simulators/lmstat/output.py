@@ -9,8 +9,11 @@ def generate_output(
     features: list[dict],
     include_details: bool,
     include_feature_usage: bool = True,
+    include_inventory: bool | None = None,
 ) -> str:
     now = datetime.now(UTC)
+    if include_inventory is None:
+        include_inventory = include_details
     feature_groups = _feature_groups(features)
     lines = [
         "lmstat - Copyright (c) 1989-2015 Flexera Software LLC. All Rights Reserved.",
@@ -26,29 +29,31 @@ def generate_output(
 
     if not include_feature_usage:
         lines.extend(f"    {vendor}: UP v11.19.5" for vendor, _ in feature_groups)
+        if include_inventory:
+            lines.extend(["", *_note_lines(), "", *_inventory_lines(features)])
         return "\n".join(lines)
 
-    for group_index, (vendor, group_features) in enumerate(feature_groups):
-        if group_index:
+    for vendor, _ in feature_groups:
+        lines.extend(["", f"    {vendor}: UP v11.19.5"])
+
+    lines.extend(["Feature usage info:", ""])
+    for index, feature in enumerate(features):
+        if index:
             lines.append("")
-        lines.append(f"    {vendor}: UP v11.19.5")
-        lines.append("Feature usage info:")
+        lines.append(_usage_line(feature))
+        if include_details:
+            detail_lines = _feature_detail_lines(server, port, feature)
+            if detail_lines:
+                lines.extend(detail_lines)
 
-        for feature in group_features:
-            lines.append(_usage_line(feature))
-            if include_details:
-                detail_lines = _feature_detail_lines(server, port, feature)
-                if detail_lines:
-                    lines.extend(detail_lines)
-
-    if include_details:
+    if include_inventory:
         lines.extend(["", *_note_lines(), "", *_inventory_lines(features)])
 
     return "\n".join(lines)
 
 
 def _users_prefix(name: str) -> str:
-    return f"Users of {name}:".ljust(30)
+    return f"Users of {name}:  "
 
 
 def _usage_line(feature: dict) -> str:
@@ -73,7 +78,7 @@ def _feature_detail_lines(server: str, port: int, feature: dict) -> list[str]:
         return []
     lines = [
         "",
-        f'  "{name}" v1.0, vendor: {vendor}, expiry: {expires_at}',
+        f'  "{name}" v1.0, vendor: {vendor}, expiry: {expires_at.lower()}',
         "  floating license",
         "",
     ]
@@ -133,7 +138,7 @@ def _inventory_lines(features: list[dict]) -> list[str]:
         total = int(feature.get("total", 0))
         vendor = _vendor(feature)
         expires_at = _expires_at(feature)
-        lines.append(f"{name:<31} 1.0         {total:<11} {expires_at:<12} {vendor}")
+        lines.append(f"{name:<31} 1.0         {total:<11} {expires_at.lower():<12} {vendor}")
     return lines
 
 
@@ -148,7 +153,7 @@ def _expires_at(feature: dict) -> str:
             expires = date.fromisoformat(str(value))
         except ValueError:
             return str(value)
-    return f"{expires.day:02d}-{expires:%b-%Y}"
+    return f"{expires.day:02d}-{expires:%b-%Y}".lower()
 
 
 def _detail_line(server: str, port: int, detail: dict) -> str:

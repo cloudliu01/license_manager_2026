@@ -26,7 +26,9 @@ def main() -> int:
     try:
         host, port = parse_port_server(args.port_server)
         status = fetch_status(host, port)
-        details = fetch_checkouts(host, port, feature=args.feature_name) if args.include_details else {"checkouts": []}
+        # FlexNet's -a flag includes active checkout rows; -i alone is license-file inventory.
+        show_checkouts = args.all_features
+        details = fetch_checkouts(host, port, feature=args.feature_name) if show_checkouts else {"checkouts": []}
     except RuntimeError as exc:
         sys.stderr.write(f"{exc}\n")
         return 1
@@ -61,7 +63,16 @@ def main() -> int:
         )
 
     include_feature_usage = args.all_features or bool(args.feature_name)
-    print(generate_output(host, port, features, args.include_details, include_feature_usage))
+    print(
+        generate_output(
+            host,
+            port,
+            features,
+            args.all_features,
+            include_feature_usage,
+            include_inventory=args.include_details,
+        )
+    )
     return 0
 
 
