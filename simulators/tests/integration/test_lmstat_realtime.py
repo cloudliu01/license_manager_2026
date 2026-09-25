@@ -157,6 +157,16 @@ def test_lmstat_groups_feature_usage_under_each_vendor_daemon(tmp_path):
         assert output.index("    d2lmd: UP") < output.index('    "user1" host1')
         assert output.index("    d2lmd: UP") < output.index("Users of beta:")
         assert output.index("Users of beta:") < output.index("NOTE: lmstat -i")
+
+        filtered = subprocess.run(
+            [str(lmstat), "-c", f"{port}@127.0.0.1", "-f", "alpha"],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout
+        assert "Users of alpha:" in filtered
+        assert '"user1" host1 /dev/pts/101' in filtered
+        assert "Users of beta:" not in filtered
     finally:
         proc.send_signal(signal.SIGTERM)
         try:

@@ -27,7 +27,7 @@ def main() -> int:
         host, port = parse_port_server(args.port_server)
         status = fetch_status(host, port)
         # FlexNet's -a flag includes active checkout rows; -i alone is license-file inventory.
-        show_checkouts = args.all_features
+        show_checkouts = args.all_features or bool(args.feature_name)
         details = fetch_checkouts(host, port, feature=args.feature_name) if show_checkouts else {"checkouts": []}
     except RuntimeError as exc:
         sys.stderr.write(f"{exc}\n")
@@ -68,7 +68,7 @@ def main() -> int:
             host,
             port,
             features,
-            args.all_features,
+            args.all_features or bool(args.feature_name),
             include_feature_usage,
             include_inventory=args.include_details,
         )
