@@ -1,6 +1,6 @@
 ## Purpose
 
-定义模拟器 dummy license 的 daemon 端口分配、自动启动、lmgrd TCP enquiry 与 daemon TCP 许可事务的可观察契约。本协议是自定义模拟格式，不兼容真实 FlexNet wire protocol。
+定义模拟器 dummy license 的 daemon 端口分配、自动启动、lmgrd TCP enquiry 与 daemon TCP 许可事务的可观察契约。本协议是用户确认的 SIM1 自定义模拟二进制格式，不兼容真实 FlexNet wire protocol；自造 hex 仅用于 SIM1 回归。
 
 ## ADDED Requirements
 
@@ -27,7 +27,7 @@
 - **THEN** manager 标记该 daemon 不可用，不能把丢失的在用状态报告为 0 或悄悄重启为空池
 
 ### Requirement: 基于证据的流程和传输格式
-模拟器 SHALL 以截图 `IMG_3695`～`3698` 的可观察连接阶段作为测试基准：客户端先向 manager enquiry，取得 daemon 端口，再与 daemon 建立单独 TCP 会话，出现 checkout、可持续的心跳、明确的 release/checkin 及连接关闭；同一连接可连续承载多条报文。截图中的 A 类身份报文、B 类发现响应及 C 类 daemon 会话只可把明确显示的字段作为已知事实（见 `evidence.md`）；其余字段 MUST 标为未知，不能把项目自定义 `LMS1` 或猜测的载荷伪装为样本格式。**逐字节匹配真实流量必须先取得经授权的脱敏 PCAP/hex 与对应事件/版本证据**，冻结双向黄金样本和解析规则后才可声称实现该目标；缺少样本时 SHALL 暂停该目标的实施及验收，而非声称兼容。
+模拟器 SHALL 以截图 `IMG_3695`～`3698` 的可观察连接阶段作为测试基准：客户端先向 manager enquiry，取得 daemon 端口，再与 daemon 建立单独 TCP 会话，出现 checkout、可持续的心跳、明确的 release/checkin 及连接关闭；同一连接可连续承载多条报文。截图中的 A 类身份报文、B 类发现响应及 C 类 daemon 会话只可把明确显示的字段作为已知事实（见 `evidence.md`）；其余字段 MUST 标为未知。模拟器 SHALL 使用独立的 `SIM1` magic + opcode:u8 + payload_length:u32be + 有界的类型化二进制值（包括 dict/list/string/int/bool/null），最大 payload 1 MiB，最大字符串 4096 bytes，禁止把合成报文伪装成截图原始捕获。应用层解析 SHALL 处理 TCP 半包、粘包、长连接和错误帧，不得因为坏帧改变席位。**逐字节匹配真实流量必须先取得经授权的脱敏 PCAP/hex 与对应事件/版本证据**；缺少样本时只暂停真实兼容验收，用户已单独批准模拟专用 SIM1 格式的实现与验收。
 
 #### Scenario: 已知连接流程
 - **WHEN** 模拟客户端进行 enquiry、按返回端口连接 daemon、checkout、心跳并显式释放
@@ -35,7 +35,7 @@
 
 #### Scenario: 缺少原始报文
 - **WHEN** 只有截图而没有该会话的完整双向原始字节与事件标注
-- **THEN** 逐字节兼容验收标记为 BLOCKED，未知 payload 不填充臆测的 feature、数量或密钥值
+- **THEN** 真实 FlexNet 逐字节兼容验收标记为 BLOCKED，SIM1 的自造 golden hex 只能验收自身 codec；未知真实 payload 不填充臆测的 feature、数量或密钥值
 
 ### Requirement: lmgrd enquiry 和只读状态
 manager SHALL 支持按 daemon 列表、feature、checkout_id 询问对应 daemon 的真实端口，并通过子进程的实时查询汇总健康、状态、checkout 明细和队列；任一子进程不可用时 MUST 报告部分结果/错误而非以 0 代替其在用数；未知 feature/checkout_id SHALL 返回明确的 `UNKNOWN_FEATURE`/`UNKNOWN_CHECKOUT`，不得猜测路由。客户端 SHALL 沿用访问 manager 的 host 并使用返回的 port 连接 daemon，不得将 `SERVER_NAME` 或 `0.0.0.0` 当作连接地址。原有 `lmstat -a/-f/-i` 输出格式 SHALL 不变。
@@ -65,6 +65,17 @@ manager SHALL 支持按 daemon 列表、feature、checkout_id 询问对应 daemo
 #### Scenario: 心跳、断线与观测缺口
 - **WHEN** 客户端发送 HEARTBEAT 后断线且没有显式 checkin，或审计测试故意丢弃一段日志
 - **THEN** 在用量快照中许可仍被占用；心跳/断线不计作归还，丢失日志后的事件推算标为不确定并以新快照对账
+
+### Requirement: 外部 PID/端口附着的 SIM1 审计记录
+Linux 测试用监控程序 SHALL 接受实际 manager PID，基于 `/proc` 与监听 socket inode 发现 manager/daemon 的不同 PID 和端口，不得从模拟器引擎直接读取业务内容来伪装抓包；在拥有 `CAP_NET_RAW` 的独立进程中监听指定网卡的 IPv4/TCP 流量，按四元组、方向及 TCP 序列号重组 SIM1 帧。SQLite SHALL 分开保存每段 TCP payload 和每个完整帧：时间、server PID/端口、daemon、连接方向、原始 BLOB、原始 hex；成功解码的帧还 SHALL 保存 opcode、明确标为 SIM1 的 JSON 字段及解码状态。监控 SHALL 关联同一 TCP 会话中可证明配对的 SIM1 请求/应答，将 GRANTED/DENIED/RETURNED 等结果作为许可事件连同双方 frame ID 单独入库；未在报文中出现且无法可靠关联的 user 等字段 SHALL 为 NULL/未知，不得虚构。权限不足或 PID/监听端口不可用时 SHALL 明确失败；不支持的真实 FlexNet 流量不得伪造解码 JSON 或 seat 状态。采样从 attach 就绪之后开始，历史流量不可追回。
+
+#### Scenario: 旁路抓取与对账
+- **WHEN** 监控程序先附着真实 manager PID 后客户端依次执行不同 daemon checkout、denied、heartbeat 与 checkin
+- **THEN** SQLite 中能以实际 PID/端口区分 manager enquiry 和 daemon 业务，完整帧的 `raw_hex` 与 `raw_bytes` 逐字节相等，SIM1 JSON 和关联事件可统计状态，心跳无席位变化；`lmstat` 与日志分别印证当前使用和 OUT/IN/DENIED 事件
+
+#### Scenario: 无原始抓包权限
+- **WHEN** 监控程序没有 raw socket 权限或目标 manager PID 已退出
+- **THEN** 明确报告不可抓取，不把日志或状态快照冒充网络原始数据
 
 ### Requirement: 仓库内工具与部署迁移
 `lmstat`、workload runner、exporter 验证脚本及 Docker 种子 checkout SHALL 使用新 TCP 流程；Docker 示例 SHALL 为 daemon 配固定端口并发布对应端口。旧 HTTP/JSON API 不再受理，现有 HTTP 客户端 MUST 升级，文档不得承诺真实厂商客户端可以连接此模拟器。

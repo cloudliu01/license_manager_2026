@@ -6,15 +6,12 @@ build-backend = "setuptools.build_meta"
 name = "license-manager-simulators"
 version = "0.1.0"
 requires-python = ">=3.11"
-dependencies = [
-  "fastapi>=0.110",
-  "pydantic>=2.0",
-  "uvicorn>=0.24",
-]
+dependencies = []
 
 [project.scripts]
 lmgrd-sim = "license_manager_simulators.lmgrd.cli:main"
 lmstat-sim = "license_manager_simulators.lmstat.cli:main"
+sim-monitor = "license_manager_simulators.monitor.cli:main"
 sim-workload = "license_manager_simulators.workload.cli:main"
 
 [tool.setuptools.packages.find]

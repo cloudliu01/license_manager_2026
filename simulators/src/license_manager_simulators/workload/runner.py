@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
-from .http_client import LmgrdClient
+from .tcp_client import LmgrdClient
 from .process_manager import LmgrdProcess, free_port, simulator_wrappers
 from .sampler import sample_once
 from .scenario import DEFAULT_MISSING_FEATURE, Scenario, SyntheticUser

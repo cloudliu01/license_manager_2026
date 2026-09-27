@@ -10,6 +10,6 @@ COPY docker/simulator/start-with-seed-checkout.sh /usr/local/bin/start-with-seed
 
 RUN pip install --no-cache-dir -e /app/simulators && chmod +x /usr/local/bin/start-with-seed-checkout
 
-EXPOSE 27000
+EXPOSE 27000 42000
 
 CMD ["/usr/local/bin/start-with-seed-checkout"]

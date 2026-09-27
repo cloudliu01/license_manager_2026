@@ -5,6 +5,7 @@ services:
       dockerfile: docker/simulator/Dockerfile
     ports:
       - "27000:27000"
+      - "42000:42000"
 
   flexlm-exporter:
     build:

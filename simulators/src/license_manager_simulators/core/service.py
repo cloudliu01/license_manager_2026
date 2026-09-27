@@ -40,17 +40,18 @@ class SimulatorService:
         }
 
     def status(self) -> dict:
-        return {
-            "protocol_version": 1,
-            "server_time": _server_time(),
-            "request_id": str(uuid4()),
-            "server_name": self.server_name,
-            "port": self.port,
-            "features": self.store.status_rows(),
-            "uptime_seconds": int((datetime.now(UTC) - self.started_at).total_seconds()),
-            "config_hash": self.config_hash,
-            "counters": self.store.counters(),
-        }
+        with self._lock:
+            return {
+                "protocol_version": 1,
+                "server_time": _server_time(),
+                "request_id": str(uuid4()),
+                "server_name": self.server_name,
+                "port": self.port,
+                "features": self.store.status_rows(),
+                "uptime_seconds": int((datetime.now(UTC) - self.started_at).total_seconds()),
+                "config_hash": self.config_hash,
+                "counters": self.store.counters(),
+            }
 
     def checkout(
         self,
@@ -304,11 +305,17 @@ class SimulatorService:
             self.store.cache_set(request_id, "return", result.__dict__, now)
             return result
 
+    def has_checkout(self, checkout_id: str) -> bool:
+        with self._lock:
+            return self.store.get_checkout(checkout_id) is not None
+
     def debug_checkouts(self, limit: int = 100, feature: str | None = None, daemon: str | None = None, status: str | None = None) -> list[dict]:
-        return self.store.debug_checkouts(limit, feature, daemon, status)
+        with self._lock:
+            return self.store.debug_checkouts(limit, feature, daemon, status)
 
     def debug_queue(self, limit: int = 100, feature: str | None = None, daemon: str | None = None) -> list[dict]:
-        return self.store.debug_queue(limit, feature, daemon)
+        with self._lock:
+            return self.store.debug_queue(limit, feature, daemon)
 
 
 def _server_time() -> str:

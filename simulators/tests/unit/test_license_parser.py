@@ -20,6 +20,29 @@ def test_parse_license_text_groups_features_by_daemon():
     assert config.features["alpha"].daemon == "vendorA"
     assert config.features["alpha"].expires_at.isoformat() == "2026-12-31"
     assert config.features["beta"].daemon == "default"
+    assert config.daemon_ports == {"vendorA": None, "default": None}
+
+
+def test_daemon_port_and_forward_feature_reference():
+    config = parse_license_text("PORT 27000\nFEATURE alpha 1 DAEMON vend\nDAEMON vend PORT 42000")
+    assert config.daemons == ["vend"]
+    assert config.daemon_ports == {"vend": 42000}
+
+
+@pytest.mark.parametrize(
+    ("text", "error"),
+    [
+        ("PORT 1\nPORT 2", "Duplicate PORT"),
+        ("PORT 1\nDAEMON vend\nDAEMON vend", "Duplicate DAEMON"),
+        ("PORT 1\nDAEMON vend PORT 0", "PORT out of range"),
+        ("PORT 1\nDAEMON vend PORT 1", "Conflicting daemon port"),
+        ("PORT 1\nDAEMON a PORT 40001\nDAEMON b PORT 40001", "Conflicting daemon port"),
+        ("PORT 1\nFEATURE alpha 2 DAEMON missing", "FEATURE references unknown daemon"),
+    ],
+)
+def test_rejects_invalid_daemon_configuration(text, error):
+    with pytest.raises(ValueError, match=error):
+        parse_license_text(text)
 
 
 def test_parse_license_text_supports_feature_reservations():

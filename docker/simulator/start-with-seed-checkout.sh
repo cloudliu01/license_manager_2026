@@ -11,37 +11,17 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 python - <<'PY'
-import json
-import time
-from urllib.request import Request, urlopen
+from license_manager_simulators.workload.tcp_client import LmgrdClient
 
-deadline = time.time() + 10
-last_error = None
-while time.time() < deadline:
-    try:
-        with urlopen("http://127.0.0.1:27000/v1/health", timeout=1):
-            break
-    except Exception as exc:
-        last_error = exc
-        time.sleep(0.2)
-else:
-    raise SystemExit(f"lmgrd health endpoint not ready: {last_error}")
-
-payload = {
+client = LmgrdClient(27000)
+client.wait_for_health(timeout=10)
+body = client.post_json("/v1/checkout", {
     "request_id": "seed-observability-checkout",
     "feature": "alpha",
     "user": "demo_user",
     "host": "demo_host",
     "pid": 1001,
-}
-request = Request(
-    "http://127.0.0.1:27000/v1/checkout",
-    data=json.dumps(payload).encode("utf-8"),
-    headers={"Content-Type": "application/json"},
-    method="POST",
-)
-with urlopen(request, timeout=2) as response:
-    body = json.loads(response.read().decode("utf-8"))
+})
 if body.get("status") != "GRANTED":
     raise SystemExit(f"seed checkout failed: {body}")
 PY

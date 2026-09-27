@@ -15,7 +15,7 @@ Open:
 - Grafana: <http://127.0.0.1:3000> (`admin` / `admin`)
 - Prometheus: <http://127.0.0.1:9090>
 - flexlm_exporter metrics: <http://127.0.0.1:9319/metrics>
-- Simulator health: <http://127.0.0.1:27000/v1/health>
+- Simulator manager: SIM1 TCP on `127.0.0.1:27000`; dummy vendor daemon: SIM1 TCP on `127.0.0.1:42000`. No HTTP health endpoint; see [manual SIM1 usage](../docs/manual-simulator.md).
 
 The Grafana dashboard is provisioned under `License Manager / FlexLM Simulator`.
 

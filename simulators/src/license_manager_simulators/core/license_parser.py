@@ -10,6 +10,7 @@ def parse_license_text(text: str) -> LicenseConfig:
     port: int | None = None
     server_name: str | None = None
     daemons: list[str] = []
+    daemon_ports: dict[str, int | None] = {}
     features: dict[str, FeatureDef] = {}
 
     for raw_line in text.splitlines():
@@ -22,9 +23,9 @@ def parse_license_text(text: str) -> LicenseConfig:
         if keyword == "PORT":
             if len(parts) != 2:
                 raise ValueError("PORT requires one value")
-            port = int(parts[1])
-            if port < 1 or port > 65535:
-                raise ValueError("PORT out of range")
+            if port is not None:
+                raise ValueError("Duplicate PORT")
+            port = _parse_port(parts[1])
             continue
 
         if keyword == "SERVER_NAME":
@@ -34,11 +35,15 @@ def parse_license_text(text: str) -> LicenseConfig:
             continue
 
         if keyword == "DAEMON":
-            if len(parts) != 2:
-                raise ValueError("DAEMON requires one name")
+            if len(parts) not in (2, 4) or (len(parts) == 4 and parts[2].upper() != "PORT"):
+                raise ValueError("DAEMON requires name [PORT number]")
             daemon_name = parts[1]
-            if daemon_name not in daemons:
-                daemons.append(daemon_name)
+            if not re.fullmatch(r"[A-Za-z0-9_]+", daemon_name):
+                raise ValueError("Invalid DAEMON name")
+            if daemon_name in daemon_ports:
+                raise ValueError("Duplicate DAEMON")
+            daemon_ports[daemon_name] = _parse_port(parts[3]) if len(parts) == 4 else None
+            daemons.append(daemon_name)
             continue
 
         if keyword == "FEATURE":
@@ -86,8 +91,6 @@ def parse_license_text(text: str) -> LicenseConfig:
                     continue
                 raise ValueError(f"Unknown FEATURE token: {parts[idx]}")
 
-            if daemon_name != "default" and daemon_name not in daemons:
-                raise ValueError("FEATURE references unknown daemon")
             features[name] = FeatureDef(name, total, daemon_name, expires_at, tuple(reservations))
             continue
 
@@ -95,8 +98,26 @@ def parse_license_text(text: str) -> LicenseConfig:
 
     if port is None:
         raise ValueError("PORT is required")
+    for feature in features.values():
+        if feature.daemon != "default" and feature.daemon not in daemon_ports:
+            raise ValueError(f"FEATURE references unknown daemon: {feature.daemon}")
+    if any(feature.daemon == "default" for feature in features.values()):
+        daemon_ports.setdefault("default", None)
+    fixed_ports = [value for value in daemon_ports.values() if value is not None]
+    if port in fixed_ports or len(fixed_ports) != len(set(fixed_ports)):
+        raise ValueError("Conflicting daemon port")
 
-    return LicenseConfig(port, server_name, daemons, features)
+    return LicenseConfig(port, server_name, daemons, features, daemon_ports)
+
+
+def _parse_port(value: str) -> int:
+    try:
+        port = int(value)
+    except ValueError as exc:
+        raise ValueError("PORT must be an integer") from exc
+    if not 1 <= port <= 65535:
+        raise ValueError("PORT out of range")
+    return port
 
 
 def parse_license_file(path: str) -> LicenseConfig:

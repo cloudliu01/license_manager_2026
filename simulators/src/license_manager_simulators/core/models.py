@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date, datetime
 
 
@@ -26,6 +26,7 @@ class LicenseConfig:
     server_name: str | None
     daemons: list[str]
     features: dict[str, FeatureDef]
+    daemon_ports: dict[str, int | None] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)

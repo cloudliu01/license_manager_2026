@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-import json
 import signal
 import socket
 import subprocess
-import time
 from pathlib import Path
-from urllib.request import Request, urlopen
+
+from license_manager_simulators.workload.tcp_client import LmgrdClient
 
 
 def test_lmstat_retrieves_realtime_usage_and_lmgrd_appends_activity_log(tmp_path):
@@ -272,22 +271,8 @@ def _free_port() -> int:
 
 
 def _wait_for_health(port: int, timeout: float = 5.0) -> None:
-    end = time.time() + timeout
-    while time.time() < end:
-        try:
-            with urlopen(f"http://127.0.0.1:{port}/v1/health", timeout=0.5):
-                return
-        except Exception:
-            time.sleep(0.1)
-    raise AssertionError("Health endpoint not ready")
+    LmgrdClient(port).wait_for_health(timeout)
 
 
 def _post_json(port: int, path: str, payload: dict) -> dict:
-    request = Request(
-        f"http://127.0.0.1:{port}{path}",
-        data=json.dumps(payload).encode("utf-8"),
-        headers={"Content-Type": "application/json"},
-        method="POST",
-    )
-    with urlopen(request, timeout=2) as response:
-        return json.loads(response.read().decode("utf-8"))
+    return LmgrdClient(port).post_json(path, payload)

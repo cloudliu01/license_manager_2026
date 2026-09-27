@@ -1,175 +1,78 @@
-# Manual Simulator Usage
+# Manual simulator (SIM1 TCP)
 
-Use this workflow when you want to start a simulated `lmgrd` daemon yourself, manually check out and return licenses, and view usage with `lmstat`.
+> This is a **synthetic test protocol**, NOT the FlexNet wire format. No real FlexNet vendor binary/client can talk to it. The `lmgrd` wrapper no longer launches an HTTP server; the manager listens on `PORT` and each dummy vendor daemon has its own **child PID and TCP port**.
 
-The simulator exposes HTTP endpoints for checkout/checkin operations. `lmstat` reads those endpoints and prints FlexNet-style text to the screen.
-
-## Create A License File
-
-Create a small simulator license file:
+## Start
 
 ```bash
-cat > /tmp/license.dat <<'EOF'
-SERVER_NAME lic_server_1
+cat >/tmp/license.dat <<'EOF'
+SERVER_NAME lic_server
 PORT 27000
-FEATURE alpha 2 EXP 2026-11-01
-FEATURE beta 1
+DAEMON vendorA PORT 42000
+FEATURE alpha 2 DAEMON vendorA EXP 2099-11-01
 EOF
+conda run -n venv312 simulators/wrappers/lmgrd -c /tmp/license.dat -l /tmp/lmgrd.log
 ```
 
-Supported license-file lines:
-
-- `SERVER_NAME <name>`: optional display name for the simulated server.
-- `PORT <port>`: required HTTP/listener port for the simulator.
-- `DAEMON <name>`: optional vendor daemon name.
-- `FEATURE <name> <total>`: feature name and license count.
-- `FEATURE <name> <total> DAEMON <daemon> EXP <YYYY-MM-DD>`: optional daemon and expiration. `lmstat -i` renders expiration as `DD-Mon-YYYY`, for example `01-Nov-2026`.
-- `FEATURE <name> <total> RESERVE <count> GROUP <group>`: optional reservation metadata emitted in `lmstat -a -i` output for exporter compatibility.
-- `FEATURE <name> <total> RESERVE <count> HOST_GROUP <group>`: optional host-group reservation metadata emitted in `lmstat -a -i` output for exporter compatibility.
-- `FEATURE <name> <total> RESERVE <count> HOST <host>`: optional host reservation metadata emitted in `lmstat -a -i` output for exporter compatibility.
-
-Reservation names must contain only letters, numbers, and underscores for exporter compatibility.
-
-## Start lmgrd
-
-Start the daemon in one terminal:
+In another terminal use the SIM1 client. Without a `DAEMON` port, a child binds a random port in **40000–50000** inclusive. Publish fixed vendor ports through Docker/firewalls. `FEATURE` may appear before its `DAEMON` declaration. Undeclared `default` is added when a feature uses it. `PORT 0`, duplicate daemon/port and unknown feature ownership are rejected.
 
 ```bash
-conda run -n venv312_license_manager simulators/wrappers/lmgrd \
-  -c /tmp/license.dat \
-  -l /tmp/lmgrd.log
+PYTHONPATH=simulators/src conda run -n venv312 python - <<'PY'
+from license_manager_simulators.lmgrd.wire import (
+    ENQUIRE, CHECKOUT, CHECKIN, HEARTBEAT, STATUS, request,
+)
+manager = ('127.0.0.1', 27000)
+endpoint = request(*manager, ENQUIRE, {'feature': 'alpha'})
+port = endpoint['daemons']['vendorA']['port']
+print('daemon PID and port:', endpoint)
+print('before:', request(*manager, STATUS, {})['features'])
+checkout = request('127.0.0.1', port, CHECKOUT, {
+    'feature': 'alpha', 'user': 'user1', 'host': 'host1', 'pid': 101,
+    'request_id': 'demo-1', 'quantity': 1, 'allow_queue': False,
+})
+print('checkout:', checkout)
+print('heartbeat:', request('127.0.0.1', port, HEARTBEAT, {}))
+print('checkin:', request('127.0.0.1', port, CHECKIN, {
+    'checkout_id': checkout['checkout_id'], 'request_id': 'demo-2',
+}))
+PY
 ```
 
-The process runs until you stop it with `Ctrl-C`. The simulated daemon listens on the `PORT` from the license file.
-
-Check health from another terminal:
+`request` opens one connection per call; applications may also send multiple `encode_frame(...)` requests on the same socket. HEARTBEAT does not change seat counts. TCP FIN without CHECKIN does **not** return seats. To observe a live checkout, omit the final checkin. The daemon writes OUT/IN/DENIED to the manager's single debug log writer. On daemon failure the manager reports unavailable, never zero usage.
 
 ```bash
-curl -s http://127.0.0.1:27000/v1/health
+conda run -n venv312 simulators/wrappers/lmstat -c 27000@127.0.0.1 -a -i
 ```
 
-## Check Out A License
-
-Use the checkout endpoint to request one license for a feature:
-
-```bash
-curl -s -X POST http://127.0.0.1:27000/v1/checkout \
-  -H 'Content-Type: application/json' \
-  -d '{
-    "request_id": "checkout-1",
-    "feature": "alpha",
-    "user": "user1",
-    "host": "host1",
-    "pid": 101,
-    "quantity": 2,
-    "info": "info_APS_26"
-  }'
-```
-
-Example response:
-
-```json
-{
-  "checkout_id": "<uuid>",
-  "feature": "alpha",
-  "status": "GRANTED",
-  "reason": null,
-  "total": 2,
-  "in_use": 1,
-  "queued": 0
-}
-```
-
-Save the returned `checkout_id`; you need it to return the license.
-
-If all licenses for a feature are already in use, the simulator returns `status: "QUEUED"` and keeps the request in the feature queue.
-
-`quantity` defaults to `1`. When `quantity` is greater than `1`, one checkout consumes that many licenses and one return releases the same number. `info` is optional and appears in the generated FlexNet-style log bracket.
-
-## Return A License
-
-Return a license by posting the `checkout_id` from the checkout response:
-
-```bash
-curl -s -X POST http://127.0.0.1:27000/v1/return \
-  -H 'Content-Type: application/json' \
-  -d '{
-    "request_id": "return-1",
-    "checkout_id": "<uuid-from-checkout>"
-  }'
-```
-
-When a granted license is returned and the feature has queued requests, the simulator grants the next queued checkout for the same feature.
-
-## Show Usage With lmstat
-
-Print all feature usage to the screen:
-
-```bash
-conda run -n venv312_license_manager simulators/wrappers/lmstat -c 27000@127.0.0.1 -a
-```
-
-Print all feature usage with checkout details:
-
-```bash
-conda run -n venv312_license_manager simulators/wrappers/lmstat -c 27000@127.0.0.1 -a -i
-```
-
-Print one feature with details:
-
-```bash
-conda run -n venv312_license_manager simulators/wrappers/lmstat -c 27000@127.0.0.1 -f alpha -i
-```
-
-`lmstat` writes FlexNet-style output to stdout. Example detail rows include granted and queued checkout records:
+The synthetic format is specified in `simulators/src/license_manager_simulators/lmgrd/wire.py`: `SIM1` + opcode + u32be length + typed binary payload. Example **generated, not captured** enquiry hex for `{'feature':'alpha'}`:
 
 ```text
-Users of alpha:               (Total of 2 licenses issued;  Total of 1 license in use)
-
-  "alpha" v1.0, vendor: default, expiry: 01-Nov-2026
-  floating license
-
-    "user1" host1 /dev/pts/101 (v1.0) (127.0.0.1/27000 101), start Sun 5/10 08:40
-
-NOTE: lmstat -i does not give information from the server,
-      but only reads the license file.  For this reason,
-      lmstat -a is recommended instead.
-
-Feature                         Version     #licenses    Expires      Vendor
-_______                         _________   _________    __________   ______
-alpha                           1.0         2           01-Nov-2026  default
+53494d31010000001564000173000766656174757265730005616c706861
 ```
 
-Returned checkouts are excluded from `lmstat -i` detail output.
+It deliberately does not claim the screenshot's A/B/C payload bytes. The screenshot's six-byte server-name slot cannot hold the redacted ten-byte `lic_server` value without moving offsets. Public FlexNet administration guides describe daemon/manager roles, not enough wire fields to establish real-client compatibility. See `openspec/changes/simulate-vendor-daemon-ports/evidence.md`.
 
-## Useful Debug Endpoints
+## Passive PID/port monitor and SQLite
 
-Get JSON feature status:
+On Linux, start `lmgrd` in the background (or use its actual Python PID shown in the debug log), then start a **separate** monitor *before* generating traffic:
 
 ```bash
-curl -s http://127.0.0.1:27000/v1/status
+PYTHON="$(command -v python)" simulators/wrappers/lmgrd -c /tmp/license.dat -l /tmp/lmgrd.log &
+LMGRD_PID=$!
+mkdir -p /tmp/sim1-audit
+sudo env PYTHONPATH="$PWD/simulators/src" "$(command -v python)" \
+  -m license_manager_simulators.monitor.cli \
+  --pid "$LMGRD_PID" --iface lo --db /tmp/sim1-audit/capture.sqlite \
+  --ready-file /tmp/sim1-audit/ready
 ```
 
-List checkout records:
+`sim-monitor` discovers child PIDs and their actual TCP listening ports from `/proc`; it uses Linux AF_PACKET to observe loopback **IPv4** TCP without a proxy. It needs root/`CAP_NET_RAW`. Run the checkout/heartbeat/checkin snippet above in another terminal **after** the ready file appears. The demo report and a live capture database are in [`artifacts/sim1-monitor-demo/`](../artifacts/sim1-monitor-demo/report.md).
 
 ```bash
-curl -s 'http://127.0.0.1:27000/v1/debug/checkouts?limit=20'
+sqlite3 /tmp/sim1-audit/capture.sqlite \
+  "SELECT daemon,direction,opcode,json_extract(decoded_json,'$.status'),length(raw_bytes),raw_hex FROM frames ORDER BY id;"
+sqlite3 /tmp/sim1-audit/capture.sqlite \
+  "SELECT pid,daemon,port FROM listeners ORDER BY port;"
 ```
 
-List only active granted checkouts:
-
-```bash
-curl -s 'http://127.0.0.1:27000/v1/debug/checkouts?status=GRANTED'
-```
-
-List queued requests:
-
-```bash
-curl -s 'http://127.0.0.1:27000/v1/debug/queue?limit=20'
-```
-
-## Stop lmgrd
-
-Stop the foreground `lmgrd` process with `Ctrl-C`.
-
-The activity log remains at the path passed with `-l`, for example `/tmp/lmgrd.log`.
+`frames.decoded_json` is **SIM1-only**; `raw_bytes` is the complete original binary frame BLOB, `raw_hex` is its lowercase hex, and `tcp_segments` preserves the actual captured TCP payload chunks even if a frame could not be decoded. `license_events` records observed GRANTED/DENIED/RETURNED responses linked to captured request/response frame IDs; unknown user identities stay NULL rather than guessed. For an end-to-end demo that launches both processes, executes transactions, verifies SQLite, and leaves them running, use `python tools/sim1_monitor_demo.py` (stop with `python tools/sim1_monitor_demo.py --stop`). The monitor does **not** recover traffic that occurred before attach. Packet loss, IPv6/IP fragmentation, encrypted vendor payloads, or insufficient privileges prevent reliable decoding; don't infer zero usage from missing frames. This is not a real FlexNet sniffer. Stop monitor/lmgrd with Ctrl-C or SIGTERM. HTTP `curl /v1/...` requests to the manager no longer work.

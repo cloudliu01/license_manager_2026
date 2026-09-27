@@ -4,7 +4,7 @@ This repository includes a local FlexNet-style simulator for exercising license 
 
 It provides:
 
-- `lmgrd` wrapper: starts a simulated license daemon with checkout, return, status, and debug HTTP endpoints.
+- `lmgrd` wrapper: starts a TCP manager and independent dummy vendor-daemon child processes using the **synthetic SIM1 binary protocol** (not compatible with real FlexNet clients); a separate Linux PID/port monitor captures SIM1 traffic into SQLite. See [manual simulator usage](docs/manual-simulator.md) and the [capture verification report](artifacts/sim1-monitor-demo/report.md).
 - `lmstat` wrapper: prints FlexNet-style license usage output from the simulated daemon.
 - Workload runner: generates synthetic user activity, samples `lmstat`, and stores raw snapshots plus parsed rows in SQLite.
 

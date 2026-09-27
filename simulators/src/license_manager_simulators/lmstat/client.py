@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-import json
-from urllib.error import HTTPError, URLError
-from urllib.parse import urlencode
-from urllib.request import urlopen
+from license_manager_simulators.lmgrd.wire import CHECKOUTS, STATUS, request
 
 
 def fetch_status(host: str, port: int) -> dict:
-    return _get_json(f"http://{host}:{port}/v1/status")
+    try:
+        return request(host, port, STATUS, {})
+    except (OSError, ValueError) as exc:
+        raise RuntimeError("SERVICE_UNREACHABLE") from exc
 
 
 def fetch_checkouts(
@@ -17,15 +17,9 @@ def fetch_checkouts(
     daemon: str | None = None,
     status: str | None = None,
 ) -> dict:
-    params = {"feature": feature, "daemon": daemon, "status": status}
-    query = urlencode({key: value for key, value in params.items() if value})
-    suffix = f"?{query}" if query else ""
-    return _get_json(f"http://{host}:{port}/v1/debug/checkouts{suffix}")
-
-
-def _get_json(url: str) -> dict:
+    params = {key: value for key, value in
+              (("feature", feature), ("daemon", daemon), ("status", status)) if value}
     try:
-        with urlopen(url, timeout=2) as response:
-            return json.loads(response.read().decode("utf-8"))
-    except (HTTPError, URLError, TimeoutError, OSError) as exc:
+        return request(host, port, CHECKOUTS, params)
+    except (OSError, ValueError) as exc:
         raise RuntimeError("SERVICE_UNREACHABLE") from exc

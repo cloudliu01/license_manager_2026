@@ -7,9 +7,9 @@
 - dummy license 中用 `DAEMON <name> [PORT <1..65535>]` 为每个 daemon 指定固定端口；不写 `PORT` 时，从 **40000–50000（含端点）** 随机尝试绑定未占用 TCP 端口。`PORT 0` 不作为动态端口的别名。
 - 启动 `lmgrd` 时为显式声明及隐式 `default` daemon 启动**独立子进程、独立 PID 和 TCP listener**；全部成功后才对外报告就绪，日志写入各自真实 PID/端口。失败时整体退出并释放子进程与端口。
 - 客户端通过 manager 的 TCP enquiry 查询 daemon/feature 对应的端口，再向 daemon 的 TCP 连接发送 checkout、checkin/return；manager 保留状态和 lmstat 所需的只读查询。
-- **BREAKING**：模拟器内 HTTP/JSON 管理与业务 API 改为 TCP 通信；仓库内 workload、lmstat、exporter 验证脚本、Docker 种子脚本、测试及文档同步迁移。传输流程按截图中可证实的 A/B/C 类型、enquiry、daemon 通话、心跳与释放时序设计；**逐字节格式的实施以原始脱敏 PCAP/hex 样本为前置条件**，不凭截图补猜未知字段。
+- **BREAKING**：模拟器内 HTTP/JSON 管理与业务 API 改为 TCP 通信；仓库内 workload、lmstat、exporter 验证脚本、Docker 种子脚本、测试及文档同步迁移。传输流程按截图中可证实的 enquiry→daemon 通话→心跳→释放时序设计。用户已批准使用明确标记的**模拟专用 SIM1 二进制协议及自生成 golden hex**；脱敏名长度变化可以使合成格式偏移不同于截图。**真实 FlexNet 逐字节兼容仍以原始脱敏 PCAP/hex 为前置条件**，不凭截图补猜未知字段。
 - 每个 daemon 子进程拥有其 feature 的状态与事务，manager 负责进程监管、发现及汇总；日志、错误路由和生命周期可测试。
-- 为将来的审计程序提供可验证的模拟环境：测试按 manager PID→监听端口→daemon 端口→TCP 会话识别拓扑，把 OUT/IN/DENIED 日志与 lmstat 快照和真实席位状态对账；明确哪些字段只能从模拟协议解码、哪些在真实 FlexNet 流量里无法保证获取。
+- 为将来的审计程序提供可验证的模拟环境：新增 Linux 测试用旁路监控程序，以实际 manager PID 发现子进程/端口，从真实 IPv4 TCP 流量重组 SIM1；在本地 SQLite 保存原始 hex/BLOB 及解码 JSON，并与 OUT/IN/DENIED、lmstat 快照和真实席位状态对账。明确哪些字段只能从模拟协议解码、哪些在真实 FlexNet 流量里无法保证获取。
 
 ## Capabilities
 

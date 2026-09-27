@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import os
 import shutil
 import socket
@@ -10,10 +9,12 @@ import tempfile
 import time
 from pathlib import Path
 from urllib.error import URLError
-from urllib.request import Request, urlopen
+from urllib.request import urlopen
 
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / "simulators" / "src"))
+from license_manager_simulators.workload.tcp_client import LmgrdClient  # noqa: E402
 EXPORTER_DIR = ROOT / "third_party" / "flexlm_exporter"
 LMGRD = ROOT / "simulators" / "wrappers" / "lmgrd"
 LMUTIL = ROOT / "tools" / "flexlm_exporter" / "lmutil"
@@ -59,9 +60,9 @@ def main() -> int:
         exporter_proc = None
         try:
             lmgrd_proc = _start_lmgrd(license_path, log_path)
-            _wait_for_url(f"http://127.0.0.1:{simulator_port}/v1/health", lmgrd_proc)
-            _post_json(
-                simulator_port,
+            client = LmgrdClient(simulator_port)
+            client.wait_for_health(timeout=10)
+            client.post_json(
                 "/v1/checkout",
                 {"request_id": "verify-1", "feature": "alpha", "user": "user1", "host": "host1", "pid": 101},
             )
@@ -161,17 +162,6 @@ def _wait_for_required_metrics(
             return metrics
         time.sleep(interval)
     return metrics
-
-
-def _post_json(port: int, path: str, payload: dict) -> dict:
-    request = Request(
-        f"http://127.0.0.1:{port}{path}",
-        data=json.dumps(payload).encode("utf-8"),
-        headers={"Content-Type": "application/json"},
-        method="POST",
-    )
-    with urlopen(request, timeout=2) as response:
-        return json.loads(response.read().decode("utf-8"))
 
 
 def _free_port() -> int:
