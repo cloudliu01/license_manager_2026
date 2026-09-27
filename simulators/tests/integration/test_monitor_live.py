@@ -29,6 +29,104 @@ pytestmark = pytest.mark.skipif(
 ROOT = Path(__file__).resolve().parents[3]
 
 
+def test_monitor_decodes_native_style_lmstat_traffic(tmp_path):
+    """The native lmstat path must be captured and decoded as FLEXLM traffic
+    while SIM1 checkout traffic on the same server stays SIM1_DECODED."""
+    subprocess.run(["sudo", "-n", "true"], check=True, capture_output=True)
+    port = _port()
+    license_path = tmp_path / "license.dat"
+    db_path = tmp_path / "audit.sqlite"
+    ready = tmp_path / "monitor.ready"
+    license_path.write_text(f"PORT {port}\nFEATURE alpha 3 EXP 2026-11-01\n", encoding="utf-8")
+    env = {**os.environ, "PYTHON": sys.executable}
+    proc = subprocess.Popen(
+        [str(ROOT / "simulators/wrappers/lmgrd"), "-c", str(license_path), "-l", str(tmp_path / "debug.log")],
+        env=env,
+    )
+    monitor = None
+    try:
+        def server_ready() -> bool:
+            if proc.poll() is not None:
+                raise AssertionError("lmgrd exited")
+            try:
+                request("127.0.0.1", port, STATUS, {})
+                return True
+            except OSError:
+                return False
+
+        _wait(server_ready)
+        monitor = subprocess.Popen([
+            "sudo", "-n", "env", f"PYTHONPATH={ROOT / 'simulators/src'}", sys.executable,
+            "-m", "license_manager_simulators.monitor.cli", "--pid", str(proc.pid),
+            "--db", str(db_path), "--ready-file", str(ready),
+        ])
+
+        def monitor_ready() -> bool:
+            if monitor.poll() is not None:
+                raise AssertionError("monitor exited")
+            return ready.exists()
+
+        _wait(monitor_ready)
+        request("127.0.0.1", _route_to_daemon(port, "alpha")["port"], CHECKOUT, {
+            "feature": "alpha", "user": "native_probe", "host": "demo", "pid": 42,
+            "allow_queue": False,
+        })
+        result = subprocess.run(
+            [sys.executable, "-m", "license_manager_simulators.lmstat.cli",
+             "-c", f"{port}@127.0.0.1", "-a"],
+            check=True, capture_output=True, text=True,
+            env={**os.environ, "PYTHONPATH": str(ROOT / "simulators/src")},
+        )
+        assert "Users of alpha:" in result.stdout
+        assert '"native_probe" demo /dev/pts/42' in result.stdout
+
+        def recorded() -> bool:
+            with sqlite3.connect(db_path) as conn:
+                flex = conn.execute("""SELECT count(*) FROM frames
+                    WHERE decode_status='FLEXLM_DECODED'
+                    AND decoded_json LIKE '%alpha%'""").fetchone()[0]
+                greeting = conn.execute("""SELECT count(*) FROM frames
+                    WHERE decoded_json LIKE '%eda-greeting%'""").fetchone()[0]
+                sim1 = conn.execute("""SELECT count(*) FROM frames
+                    WHERE decode_status='SIM1_DECODED'""").fetchone()[0]
+                return flex >= 1 and greeting >= 1 and sim1 >= 1
+
+        _wait(recorded)
+        with sqlite3.connect(db_path) as conn:
+            statuses = dict(conn.execute(
+                "SELECT decode_status, count(*) FROM frames GROUP BY 1").fetchall())
+            assert statuses.get("FLEXLM_DECODED", 0) >= 1
+            assert statuses.get("SIM1_DECODED", 0) >= 1
+            flex_rows = conn.execute("""SELECT direction, decoded_json FROM frames
+                WHERE decode_status='FLEXLM_DECODED'
+                AND decoded_json LIKE '%alpha%' LIMIT 3""").fetchall()
+            assert any('"strings"' in row[1] or '"fields"' in row[1] for row in flex_rows)
+    finally:
+        if monitor is not None:
+            children = Path(f"/proc/{monitor.pid}/task/{monitor.pid}/children")
+            if children.exists():
+                for pid in children.read_text().split():
+                    subprocess.run(["sudo", "-n", "kill", "-TERM", pid], check=False)
+            else:
+                monitor.send_signal(signal.SIGTERM)
+            try:
+                monitor.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                monitor.kill()
+                monitor.wait(timeout=5)
+        proc.send_signal(signal.SIGTERM)
+        try:
+            proc.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            proc.wait(timeout=5)
+
+
+def _route_to_daemon(port: int, feature: str) -> dict:
+    route = request("127.0.0.1", port, ENQUIRE, {"feature": feature})
+    return next(iter(route["daemons"].values()))
+
+
 def _port() -> int:
     with socket.socket() as sock:
         sock.bind(("127.0.0.1", 0))

@@ -43,8 +43,8 @@ def main() -> int:
             writer.write_raw_lines(vendor_daemon_startup(
                 ts, name, worker.port, worker.pid, "v11.19.5.1", "293554", server_name, features,
             ))
-        writer.write_line("lmgrd", "SIM1 synthetic TCP only; not a real FlexNet wire implementation")
-        serve(config, group, stop)
+        writer.write_line("lmgrd", "SIM1 transactions + native-style FlexLM status surface (lmgrd/native.py)")
+        serve(config, group, stop, license_path=args.license_path)
     return 0
 
 

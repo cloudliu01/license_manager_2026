@@ -5,6 +5,9 @@ Payload tags: n=null, t/f=bool, i=signed i64, s=utf8 (u16be length),
 l=list (u16be items), d=dict (u16be pairs of string keys + values).
 This deliberately has a distinctive magic to prevent mistaking generated hex for
 captured A/B/C messages. MAX_FRAME also limits allocations on untrusted sockets.
+
+The native-style FlexLM surface transcribed from real captures lines in lmgrd/native.py;
+both are served by the same listeners (dispatched per connection by first byte).
 """
 
 from __future__ import annotations

@@ -32,17 +32,33 @@ def _listener_inodes() -> dict[int, int]:
 
 
 def _daemon_name(pid: int) -> str | None:
+    """Simulator worker daemons carry the feature name after the worker marker;
+    real FlexLM vendor daemons (e.g. empyrean) fall back to their argv[0] base
+    name so listeners stay attributable.
+    """
     try:
         args = Path(f"/proc/{pid}/cmdline").read_bytes().split(b"\0")
         marker = b"license_manager_simulators.lmgrd.worker"
         idx = args.index(marker)
         return args[idx + 2].decode("utf-8")
     except (OSError, ValueError, IndexError, UnicodeDecodeError):
+        pass
+    try:
+        argv0 = Path(f"/proc/{pid}/cmdline").read_bytes().split(b"\0")[0]
+        return Path(argv0.decode("utf-8", "replace")).name or None
+    except (OSError, IndexError):
         return None
 
 
 def discover(manager_pid: int) -> dict[int, Listener]:
-    """Return port -> owner; fail closed if the requested PID no longer exists."""
+    """Return port -> owner; fail closed if the requested PID no longer exists.
+
+    Real FlexLM servers fork the vendor daemon from lmgrd, so both processes
+    hold the same listening sockets. The manager is iterated first and keeps
+    the port entry (first owner wins) so the caller's manager-PID sanity
+    check still holds; exclusive child ports are still attributed to the
+    child with its daemon name.
+    """
     if not Path(f"/proc/{manager_pid}").exists():
         raise ProcessLookupError(manager_pid)
     listeners = _listener_inodes()
@@ -59,7 +75,7 @@ def discover(manager_pid: int) -> dict[int, Listener]:
                     continue
                 inode = int(target[8:-1])
                 port = listeners.get(inode)
-                if port is not None:
+                if port is not None and port not in result:
                     result[port] = Listener(pid, port, name, inode)
         except (FileNotFoundError, PermissionError):
             continue

@@ -1,13 +1,26 @@
-"""SIM1 manager TCP endpoint: discovery and read-only snapshots only."""
+"""SIM1 and native-style FlexLM TCP endpoints on the manager port.
+
+SIM1 handles synthetic transactions. The native-style surface is delegated to
+``lmgrd.native`` for capture-derived status clients; it does not imply complete
+FlexNet wire compatibility.
+"""
 
 from __future__ import annotations
 
+import hashlib
 import socket
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from threading import Event, Thread
 from uuid import uuid4
 
 from license_manager_simulators.core.models import LicenseConfig
+from license_manager_simulators.lmgrd import native
+from license_manager_simulators.lmgrd.native import (
+    LISTING_TYPE,
+    SEATS_TYPE,
+    USER_TYPE,
+    serve_native,
+)
 from license_manager_simulators.lmgrd.processes import ProcessGroup, WorkerUnavailable
 from license_manager_simulators.lmgrd.wire import (
     CHECKOUTS,
@@ -117,7 +130,12 @@ def _handle(connection: socket.socket, config: LicenseConfig, group: ProcessGrou
                 return
 
 
-def serve(config: LicenseConfig, group: ProcessGroup, stop: Event) -> None:
+def serve(
+    config: LicenseConfig,
+    group: ProcessGroup,
+    stop: Event,
+    license_path: str = "",
+) -> None:
     listener = group.reservation.manager
     listener.settimeout(0.5)
     while not stop.is_set():
@@ -129,4 +147,99 @@ def serve(config: LicenseConfig, group: ProcessGroup, stop: Event) -> None:
             if stop.is_set():
                 break
             raise
-        Thread(target=_handle, args=(connection, config, group), daemon=True).start()
+
+        connection.settimeout(10)
+        try:
+            first = native.peek_protocol(connection)
+        except OSError:
+            connection.close()
+            continue
+        if first is None:
+            connection.close()
+            continue
+
+        # SIM1 frames start with 'S'. Only capture-observed native-style
+        # signatures are dispatched to that handler; unknown bytes retain the
+        # existing SIM1 error behavior rather than being guessed as native.
+        if first == ord("S") or first not in (0x68, 0x2F, 0x3C, 0x3E):
+            handler = _handle
+            args = (connection, config, group)
+        else:
+            handler = _serve_native
+            args = (connection, config, group, license_path)
+        Thread(target=handler, args=args, daemon=True).start()
+
+
+def _expires_native(value: date | None) -> str:
+    return native.native_expires(value)
+
+
+def _hostid(config: LicenseConfig) -> str:
+    material = "|".join(
+        f"{feature.name}:{feature.total}"
+        for feature in sorted(config.features.values(), key=lambda item: item.name)
+    )
+    return hashlib.sha1(material.encode("utf-8")).hexdigest()[:8].upper()
+
+
+def _inventory_text(config: LicenseConfig) -> str:
+    lines = [
+        f"SERVER {config.server_name or '127.0.0.1'} {_hostid(config)} {config.port}"
+    ]
+    for daemon in sorted(config.daemons):
+        lines.append(f"VENDOR {daemon} /opt/licenses/{daemon}")
+    for feature in sorted(config.features.values(), key=lambda item: item.name):
+        line = (
+            f"FEATURE {feature.name} {feature.total} "
+            f"{_expires_native(feature.expires_at)} {feature.daemon}"
+        )
+        for reservation in feature.reservations:
+            line += f" RESERVE {reservation.count} {reservation.kind} {reservation.name}"
+        lines.append(line)
+    return "\n".join(lines)
+
+
+def _usage_frames(
+    config: LicenseConfig, group: ProcessGroup, feature: str,
+) -> tuple[list[tuple[int, list[str]]], str]:
+    definition = config.features.get(feature)
+    if definition is None:
+        return [], "UNKNOWN_FEATURE"
+    worker = group.workers.get(definition.daemon)
+    if worker is None or worker.process.poll() is not None:
+        return [], "UNKNOWN_DAEMON"
+    try:
+        rows = [row for row in worker.request(
+            "checkouts", limit=500, feature=feature)["checkouts"]
+            if row.get("status") in ("GRANTED", "QUEUED")]
+    except WorkerUnavailable:
+        return [], "UNKNOWN_DAEMON"
+    frames = [(SEATS_TYPE, [str(definition.total), str(int(datetime.now(UTC).timestamp()))])]
+    for row in rows:
+        frames.append((USER_TYPE, [
+            row["user"], row["host"], f"/dev/pts/{row.get('pid', 0)}", "1.0", row["status"],
+        ]))
+    return frames, ""
+
+
+def _native_responder(
+    config: LicenseConfig, group: ProcessGroup, license_path: str,
+):
+    def respond(command: str, argument: str) -> tuple[list[tuple[int, list[str]]], str]:
+        if command == "getpaths":
+            return [(LISTING_TYPE, [license_path or "/path/to/license.dat"])], ""
+        if command == "dlist":
+            return [(LISTING_TYPE, [" ".join(sorted(config.daemons))])], ""
+        if command == "inventory":
+            return [(LISTING_TYPE, [_inventory_text(config)])], ""
+        if command == "usage":
+            return _usage_frames(config, group, argument)
+        return [], "UNKNOWN_COMMAND"
+    return respond
+
+
+def _serve_native(
+    connection: socket.socket, config: LicenseConfig, group: ProcessGroup,
+    license_path: str,
+) -> None:
+    serve_native(connection, "lmgrd", _native_responder(config, group, license_path))

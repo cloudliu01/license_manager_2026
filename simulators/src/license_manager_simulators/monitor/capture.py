@@ -21,6 +21,11 @@ from license_manager_simulators.lmgrd.wire import (
     ProtocolError,
     decode_frame,
 )
+from license_manager_simulators.monitor.flexlm import (
+    decode_flexlm_frame,
+    greeting_boundary,
+    lsf_declared,
+)
 from license_manager_simulators.monitor.topology import Listener, discover
 
 PACKET_HOST = 0
@@ -77,12 +82,14 @@ class Stream:
     next_seq: int | None = None
     data: bytearray = field(default_factory=bytearray)
     pending: dict[int, bytes] = field(default_factory=dict)
+    mode: str | None = None  # sim1 | lsf | greeting; None until enough bytes
 
     def feed(self, segment: Segment) -> list[bytes]:
         if segment.syn:
             self.next_seq = (segment.seq + 1) & 0xFFFFFFFF
             self.data.clear()
             self.pending.clear()
+            self.mode = None
         if not segment.payload:
             return []
         seq = segment.seq
@@ -102,6 +109,33 @@ class Stream:
         self._append(payload)
         while self.next_seq in self.pending:
             self._append(self.pending.pop(self.next_seq))
+        return self._extract()
+
+    def _extract(self) -> list[bytes]:
+        if self.mode is None:
+            if self.data[:4] == MAGIC:
+                self.mode = "sim1"
+            elif self.data[:1] == b"\x2f":
+                self.mode = "lsf"
+            elif (
+                len(self.data) >= 4
+                and (
+                    (self.data[:1] == b"\x68" and self.data[2:4] == b"13")
+                    or self.data[:1] in (b"\x3c", b"\x3e")
+                )
+            ):
+                self.mode = "greeting"
+            elif len(self.data) >= 4:
+                self.mode = "sim1"  # legacy resync-until-magic behavior
+        if self.mode == "sim1":
+            return self._extract_sim1()
+        if self.mode == "lsf":
+            return self._extract_lsf()
+        if self.mode == "greeting":
+            return self._extract_greeting()
+        return []
+
+    def _extract_sim1(self) -> list[bytes]:
         frames: list[bytes] = []
         while len(self.data) >= 9:
             if self.data[:4] != MAGIC:
@@ -121,6 +155,50 @@ class Stream:
             del self.data[:size + 9]
         return frames
 
+    def _extract_lsf(self) -> list[bytes]:
+        frames: list[bytes] = []
+        while len(self.data) >= 12:
+            if self.data[:1] != b"\x2f":
+                pos = self._resync()
+                if pos < 0:
+                    del self.data[:-11]
+                    break
+                del self.data[:pos]
+                continue
+            declared = lsf_declared(self.data)
+            if not declared:
+                del self.data[:1]
+                continue
+            if len(self.data) < declared:
+                break
+            frames.append(bytes(self.data[:declared]))
+            del self.data[:declared]
+        return frames
+
+    def _extract_greeting(self) -> list[bytes]:
+        end = greeting_boundary(self.data)
+        if end is None:
+            return []
+        frames = [bytes(self.data[:end])]
+        del self.data[:end]
+        self.mode = "lsf"
+        frames.extend(self._extract_lsf())
+        return frames
+
+    def _resync(self) -> int:
+        for pos in range(1, max(len(self.data) - 11, 1)):
+            if lsf_declared(self.data[pos:]) and self.data[pos + 6] == 0x01:
+                return pos
+        return -1
+
+    def finish(self) -> list[bytes]:
+        """Return trailing unframed greeting/ping bytes when a stream closes."""
+        if self.mode == "greeting" and self.data:
+            out = bytes(self.data)
+            self.data.clear()
+            return [out]
+        return []
+
     def _append(self, payload: bytes) -> None:
         self.data.extend(payload)
         assert self.next_seq is not None
@@ -135,6 +213,7 @@ class AuditDatabase:
         self.conn = sqlite3.connect(path)
         self.conn.executescript("""
             PRAGMA journal_mode=WAL;
+            PRAGMA synchronous=OFF;
             CREATE TABLE IF NOT EXISTS listeners (
                 observed_at TEXT NOT NULL, manager_pid INTEGER NOT NULL,
                 pid INTEGER NOT NULL, daemon TEXT, port INTEGER NOT NULL, socket_inode INTEGER NOT NULL,
@@ -196,7 +275,13 @@ class AuditDatabase:
             decoded = json.dumps(payload, ensure_ascii=False, sort_keys=True)
             state = "SIM1_DECODED"
         except ProtocolError as exc:
-            opcode, payload, decoded, state = None, None, None, f"DECODE_ERROR:{exc}"
+            flex = decode_flexlm_frame(raw, direction)
+            if flex is None:
+                opcode, payload, decoded, state = None, None, None, f"DECODE_ERROR:{exc}"
+            else:
+                opcode, payload = flex
+                decoded = json.dumps(payload, ensure_ascii=False, sort_keys=True)
+                state = "FLEXLM_DECODED"
         self.conn.execute("""INSERT INTO frames
             (observed_at,manager_pid,server_pid,server_port,daemon,src_ip,src_port,
              dst_ip,dst_port,direction,opcode,decoded_json,decode_status,raw_hex,raw_bytes)
@@ -237,6 +322,10 @@ def run(manager_pid: int, db_path: str, interface: str = "lo", ready_file: str |
         raise RuntimeError("manager PID has no listening TCP socket")
     with socket.socket(socket.AF_PACKET, socket.SOCK_RAW, socket.htons(0x0003)) as capture:
         capture.bind((interface, 0))
+        try:
+            capture.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 8 << 20)
+        except OSError:
+            pass  # best effort on busy interfaces; see lic_capture_server.py
         capture.settimeout(0.25)
         db = AuditDatabase(db_path, manager_pid)
         streams: dict[tuple[str, int, str, int], Stream] = {}
@@ -282,8 +371,8 @@ def run(manager_pid: int, db_path: str, interface: str = "lo", ready_file: str |
                     requests.pop(session, None)
                 for frame in stream.feed(segment):
                     frame_id, opcode, payload = db.frame(frame, segment, listener, direction)
-                    if payload is None:
-                        continue
+                    if payload is None or "proto" in payload:
+                        continue  # FlexLM frames take no part in SIM1 correlation
                     if direction == "client_to_server" and opcode in (3, 4):
                         pending = requests.setdefault(session, [])
                         if len(pending) < 128:
@@ -295,6 +384,8 @@ def run(manager_pid: int, db_path: str, interface: str = "lo", ready_file: str |
                         sent = pending.pop(index) if index is not None else None
                         db.license_event(frame_id, payload, (sent[1], sent[2]) if sent else None, listener)
                 if segment.fin or segment.rst:
+                    for tail in stream.finish():
+                        db.frame(tail, segment, listener, direction)
                     streams.pop(key, None)
                     if direction == "client_to_server":
                         requests.pop(session, None)

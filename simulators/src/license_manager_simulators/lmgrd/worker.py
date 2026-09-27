@@ -1,10 +1,16 @@
-"""Dummy daemon child: SIM1 is synthetic and cannot serve real FlexNet clients."""
+"""Dummy daemon child: SIM1 transactions plus the native-style status surface.
+
+Like the real daemon it also inherits and holds the lmgrd listening socket
+(shared file-descriptor ownership), while serving connections only on its own
+port.
+"""
 
 from __future__ import annotations
 
 import os
 import socket
 import sys
+import time
 from dataclasses import asdict
 from datetime import datetime
 from threading import Lock, Thread
@@ -14,6 +20,13 @@ from license_manager_simulators.core.log_writer import MemoryLogWriter
 from license_manager_simulators.core.models import LicenseConfig
 from license_manager_simulators.core.service import SimulatorService
 from license_manager_simulators.core.store import SimulatorStore
+from license_manager_simulators.lmgrd import native
+from license_manager_simulators.lmgrd.native import (
+    LISTING_TYPE,
+    SEATS_TYPE,
+    USER_TYPE,
+    serve_native,
+)
 from license_manager_simulators.lmgrd.processes import (
     WorkerUnavailable,
     _receive,
@@ -92,23 +105,123 @@ def _handle_client(connection: socket.socket, service: SimulatorService) -> None
                 return
 
 
-def _serve(listener: socket.socket, service: SimulatorService) -> None:
-    listener.settimeout(0.5)
-    while listener.fileno() != -1:
-        try:
-            connection, _ = listener.accept()
-        except TimeoutError:
+def _native_responder(service: SimulatorService, daemon: str):
+    def respond(command: str, argument: str) -> tuple[list[tuple[int, list[str]]], str]:
+        if command == "dlist":
+            return [(LISTING_TYPE, [daemon])], ""
+        if command == "inventory":
+            features = [
+                feature
+                for feature in service.status()["features"]
+                if feature["daemon"] == daemon
+            ]
+            frames = [
+                (SEATS_TYPE, [str(feature["total"]), str(int(time.time()))])
+                for feature in features
+            ]
+            frames.append((LISTING_TYPE, [_inventory_text(service, daemon)]))
+            return frames, ""
+        if command == "usage":
+            return _usage_frames(service, daemon, argument)
+        return [], "UNKNOWN_COMMAND"
+
+    return respond
+
+
+def _inventory_text(service: SimulatorService, daemon: str) -> str:
+    lines = [f"VENDOR {daemon} /opt/licenses/{daemon}"]
+    for feature in service.status()["features"]:
+        if feature["daemon"] != daemon:
             continue
-        except OSError:
-            return
-        Thread(target=_handle_client, args=(connection, service), daemon=True).start()
+        line = (
+            f"FEATURE {feature['feature']} {feature['total']} "
+            f"{native.native_expires(feature.get('expires_at'))} {feature['daemon']}"
+        )
+        for reservation in feature.get("reservations", []):
+            line += (
+                f" RESERVE {reservation.get('count', 0)} "
+                f"{str(reservation.get('kind', '')).upper()} {reservation.get('name', '')}"
+            )
+        lines.append(line)
+    return "\n".join(lines)
+
+
+def _usage_frames(
+    service: SimulatorService, daemon: str, feature: str
+) -> tuple[list[tuple[int, list[str]]], str]:
+    status = service.status()["features"]
+    definition = next((item for item in status if item["feature"] == feature), None)
+    if definition is None or definition["daemon"] != daemon:
+        return [], "UNKNOWN_FEATURE"
+
+    rows = service.debug_checkouts(500, feature, daemon, "GRANTED")
+    frames = [
+        (
+            USER_TYPE,
+            [
+                row["user"],
+                row["host"],
+                f"/dev/pts/{row.get('pid', 0)}",
+                "1.0",
+                row["status"],
+            ],
+        )
+        for row in rows
+    ]
+    return frames, ""
+
+
+def _serve_native_connection(
+    connection: socket.socket, service: SimulatorService, daemon: str
+) -> None:
+    serve_native(connection, daemon, _native_responder(service, daemon))
+
+
+def _serve(
+    listener: socket.socket,
+    service: SimulatorService,
+    manager_fd: int | None,
+    daemon: str,
+) -> None:
+    listener.settimeout(0.5)
+    manager_listener = (
+        socket.socket(fileno=os.dup(manager_fd)) if manager_fd is not None else None
+    )
+    try:
+        while listener.fileno() != -1:
+            try:
+                connection, _ = listener.accept()
+            except TimeoutError:
+                continue
+            except OSError:
+                return
+            connection.settimeout(10)
+            try:
+                first = native.peek_protocol(connection)
+            except OSError:
+                connection.close()
+                continue
+            if first is None:
+                connection.close()
+                continue
+            if first == ord("S") or first not in (0x68, 0x2F, 0x3C, 0x3E):
+                handler = _handle_client
+                args = (connection, service)
+            else:
+                handler = _serve_native_connection
+                args = (connection, service, daemon)
+            Thread(target=handler, args=args, daemon=True).start()
+    finally:
+        if manager_listener is not None:
+            manager_listener.close()
 
 
 def main() -> int:
-    license_path, daemon, listener_fd, channel_fd, log_fd = sys.argv[1:]
+    license_path, daemon, listener_fd, channel_fd, log_fd, manager_fd = sys.argv[1:]
     listener = socket.socket(fileno=int(listener_fd))
     channel = socket.socket(fileno=int(channel_fd))
     log_channel = socket.socket(fileno=int(log_fd))
+    manager_listener = socket.socket(fileno=int(manager_fd))
     try:
         config = parse_license_file(license_path)
         if daemon not in config.daemon_ports:
@@ -125,7 +238,11 @@ def main() -> int:
             config.server_name or "127.0.0.1", config.port, "internal",
         )
         # Only the manager may publish readiness after every child acknowledges.
-        Thread(target=_serve, args=(listener, service), daemon=True).start()
+        Thread(
+            target=_serve,
+            args=(listener, service, manager_listener.fileno(), daemon),
+            daemon=True,
+        ).start()
         while True:
             try:
                 request = _receive(channel)
@@ -159,6 +276,7 @@ def main() -> int:
         listener.close()
         channel.close()
         log_channel.close()
+        manager_listener.close()
 
 
 if __name__ == "__main__":

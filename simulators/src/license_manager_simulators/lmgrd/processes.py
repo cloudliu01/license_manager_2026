@@ -1,7 +1,9 @@
-"""Internal daemon process lifecycle; deliberately no public wire protocol yet.
+"""Internal daemon process lifecycle and real child PID/socket ownership. 
 
-The wire format is blocked on annotated raw capture samples. This module only
-establishes real child PIDs, socket ownership and read-only IPC snapshots.
+Children are forked with their own bound listener, a private control channel and an 
+inherited (held but never accepted-on) copy of the lmgrd listening socket, matching 
+the shared fd topology observed on real FlexLM servers. 
+The native wire surface is implemented in lmgrd/native.py; SIM1 in wired.py.
 """
 
 from __future__ import annotations
@@ -169,8 +171,10 @@ def start_process_group(
             try:
                 proc = subprocess.Popen(
                     [sys.executable, "-m", "license_manager_simulators.lmgrd.worker", license_path, name,
-                     str(listener.fileno()), str(child.fileno()), str(log_child.fileno())],
-                    pass_fds=(listener.fileno(), child.fileno(), log_child.fileno()),
+                     str(listener.fileno()), str(child.fileno()), str(log_child.fileno()),
+                     str(reservation.manager.fileno())],
+                    pass_fds=(listener.fileno(), child.fileno(), log_child.fileno(),
+                                reservation.manager.fileno()),
                     env=env,
                 )
             except BaseException:
