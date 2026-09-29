@@ -60,15 +60,17 @@ The supplied editor diff describes a **second, separate status-query surface** t
 |---|---|---|
 | `getpaths` | Request server/daemon path information (lmgrd greeting/enquiry path) | `0x08` request; `0x0e` hello response |
 | `dlist` | List vendor daemons | `0x46` listing response |
-| `inventory` | List licensed features/inventory | `0x4e` seats response |
-| `usage <feature>` | Query users/checkouts for one feature | `0x14` user rows; `0x13` end marker |
-| `ping` | Status-surface liveness probe | Request starts `0x3c`; response starts `0x3e` (both noted as fixed 147-byte messages) |
+| `inventory` | List licensed features/inventory | `0x46` listing response (plus `0x4e` seats on the daemon-scoped surface) |
+| `usage <feature>` / `0x3c` feature query | Query users/checkouts for one feature | `0x4e` seats `[in_use, issued, epoch]`; `0x14` user rows `[user, host, tty, version]`; `0x13` end marker (simulator extension) |
+| `ping` | Status-surface liveness probe | Fixed 147-byte messages: request starts `0x3c`, response starts `0x3e` |
+
+The `0x3c` broker-frame feature query (not to be confused with the 147-byte `0x3c` ping) carries the feature name (and an opaque key handle on real servers) and is answered by `0x4e` followed by one `0x14` row per in-use seat; es-fs captures calibrate the `0x4e` numbers as `[in_use, issued, epoch]`.
 
 The capture notes further describe a fixed 147-byte EDA greeting beginning `0x68`, with subsequent bytes only partially identified (`??`, `"13"`); and `0x2f` broker frames containing a declared big-endian u16 length, version, type, Unix timestamp and NUL-terminated strings at capture-observed offsets. These are **capture-specific observations**, not a complete grammar. String offsets and lengths can change when values are redacted (for example, the server display name is shown here as `lic_server`).
 
 A session-crypto handshake was observed with leading bytes `0x41/0x47/0x55/0x56/0x3d/0x61`; the screenshot explicitly says this handshake is omitted and the simulator grants without issuing a challenge. Consequently this surface does **not** implement or validate FlexNet session encryption/authentication. Do not send real license-server traffic or treat these message IDs as a stable public API.
 
-**Implementation status:** this checkout currently contains `lmgrd/wire.py` for SIM1; it does not contain the `lmgrd/native.py` status-surface implementation referenced in the screenshot. The command/byte table above is extracted from the screenshot for documentation only and is not a claim that the commands are currently served or decoded. Until that implementation and its capture-based tests are added, use SIM1 for the running monitor demo; its decoder will not decode these native-style frames.
+**Implementation status:** this surface is implemented in `simulators/src/license_manager_simulators/lmgrd/native.py` (served by the manager/worker alongside SIM1, consumed by the simulator's `lmstat` client in `simulators/src/license_manager_simulators/lmstat/client.py`) and covered by `simulators/tests/unit/test_native_wire.py` plus the opt-in live monitor test. The passive monitor decodes these frames as `FLEXLM_DECODED`, but derives `license_events` only from correlated SIM1 checkout/checkin responses, **not** from native-style status frames. The session-crypto handshake remains omitted, the `0x14` status column is a simulator extension, and END-terminated responses differ from the real count-driven flow.
 
 ## Passive PID/port monitor and SQLite
 

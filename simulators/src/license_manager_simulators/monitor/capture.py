@@ -22,6 +22,10 @@ from license_manager_simulators.lmgrd.wire import (
     decode_frame,
 )
 from license_manager_simulators.monitor.flexlm import (
+    FLEXLM_CRYPTO_READY,
+    FLEXLM_QUERY,
+    FLEXLM_SEATS,
+    FLEXLM_USER_ROW,
     decode_flexlm_frame,
     greeting_boundary,
     lsf_declared,
@@ -268,7 +272,8 @@ class AuditDatabase:
         self.conn.commit()
 
     def frame(
-        self, raw: bytes, segment: Segment, listener: Listener, direction: str
+        self, raw: bytes, segment: Segment, listener: Listener, direction: str,
+        enrich: dict | None = None,
     ) -> tuple[int, int | None, dict | None]:
         try:
             opcode, payload = decode_frame(raw)
@@ -282,6 +287,9 @@ class AuditDatabase:
                 opcode, payload = flex
                 decoded = json.dumps(payload, ensure_ascii=False, sort_keys=True)
                 state = "FLEXLM_DECODED"
+        if enrich and payload is not None:
+            payload.update(enrich)
+            decoded = json.dumps(payload, ensure_ascii=False, sort_keys=True)
         self.conn.execute("""INSERT INTO frames
             (observed_at,manager_pid,server_pid,server_port,daemon,src_ip,src_port,
              dst_ip,dst_port,direction,opcode,decoded_json,decode_status,raw_hex,raw_bytes)
@@ -311,8 +319,72 @@ class AuditDatabase:
             ))
         self.conn.commit()
 
+    def flexlm_event(
+        self, frame_id: int, listener: Listener, *, feature: str | None,
+        client_user: str | None, client_host: str | None, quantity: int | None,
+        status: str, reason: str | None, request_frame_id: int | None,
+        correlation: str,
+    ) -> None:
+        """Record a license observation decoded from real FlexLM traffic."""
+        self.conn.execute("""INSERT INTO license_events
+            (observed_at,server_pid,server_port,daemon,feature,client_user,client_host,
+             checkout_id,quantity,status,reason,request_frame_id,response_frame_id,correlation)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""", (
+                _now(), listener.pid, listener.port, listener.daemon,
+                feature, client_user, client_host, None, quantity,
+                status, reason, request_frame_id, frame_id, correlation,
+            ))
+        self.conn.commit()
+
     def close(self) -> None:
         self.conn.close()
+
+
+def _observe_flexlm(
+    db: AuditDatabase, listener: Listener, session: tuple, direction: str,
+    frame_id: int, payload: dict, state: dict,
+) -> None:
+    """Extract license observations from decoded FlexLM frames.
+
+    State holds per-session correlation: the last 0x3c feature query
+    (feature, frame_id), the greeting identity, and crypto sessions already
+    recorded. Missing identity/feature is never fabricated.
+    """
+    proto = payload.get("proto")
+    ftype = payload.get("type")
+    if proto == "lsf-broker" and direction == "client_to_server" and ftype == FLEXLM_QUERY:
+        state["features"][session] = (payload.get("feature"), frame_id)
+    elif proto == "lsf-broker" and direction == "server_to_client" and ftype == FLEXLM_SEATS:
+        feature, query_id = state["features"].get(session, (None, None))
+        db.flexlm_event(
+            frame_id, listener, feature=feature, client_user=None, client_host=None,
+            quantity=payload.get("in_use"), status="FLEXLM_FEATURE_SUMMARY", reason=None,
+            request_frame_id=query_id if feature else None,
+            correlation="MATCHED_FLEXLM_QUERY" if feature else "NO_FLEXLM_QUERY",
+        )
+    elif proto == "lsf-broker" and direction == "server_to_client" and ftype == FLEXLM_USER_ROW:
+        feature, _ = state["features"].get(session, (None, None))
+        db.flexlm_event(
+            frame_id, listener, feature=feature, client_user=payload.get("user"),
+            client_host=payload.get("host"), quantity=None, status="FLEXLM_IN_USE",
+            reason=None, request_frame_id=None,
+            correlation="MATCHED_FLEXLM_QUERY" if feature else "NO_FLEXLM_QUERY",
+        )
+    elif proto == "eda-greeting" and direction == "client_to_server" and payload.get("user"):
+        state["identities"][session] = (payload["user"], payload.get("host"))
+    elif (
+        proto == "lsf-broker" and direction == "server_to_client"
+        and ftype == FLEXLM_CRYPTO_READY and session not in state["crypto_seen"]
+    ):
+        identity = state["identities"].get(session)
+        if identity:
+            state["crypto_seen"].add(session)
+            db.flexlm_event(
+                frame_id, listener, feature=None, client_user=identity[0],
+                client_host=identity[1], quantity=None, status="FLEXLM_CHECKOUT_ATTEMPT",
+                reason="encrypted session payload; identity from greeting",
+                request_frame_id=None, correlation="IDENTITY_FROM_GREETING",
+            )
 
 
 def run(manager_pid: int, db_path: str, interface: str = "lo", ready_file: str | None = None) -> None:
@@ -330,6 +402,7 @@ def run(manager_pid: int, db_path: str, interface: str = "lo", ready_file: str |
         db = AuditDatabase(db_path, manager_pid)
         streams: dict[tuple[str, int, str, int], Stream] = {}
         requests: dict[tuple[str, int, str, int], list[tuple[int, int, dict]]] = {}
+        state = {"features": {}, "identities": {}, "crypto_seen": set()}
         last_refresh = 0.0
         try:
             db.listeners(listeners)
@@ -370,24 +443,41 @@ def run(manager_pid: int, db_path: str, interface: str = "lo", ready_file: str |
                 if segment.syn and direction == "client_to_server":
                     requests.pop(session, None)
                 for frame in stream.feed(segment):
-                    frame_id, opcode, payload = db.frame(frame, segment, listener, direction)
-                    if payload is None or "proto" in payload:
-                        continue  # FlexLM frames take no part in SIM1 correlation
-                    if direction == "client_to_server" and opcode in (3, 4):
-                        pending = requests.setdefault(session, [])
-                        if len(pending) < 128:
-                            pending.append((opcode, frame_id, payload))
-                    elif direction == "server_to_client" and opcode in (131, 132):
-                        pending = requests.get(session, [])
-                        expected = opcode & 0x7F
-                        index = next((i for i, item in enumerate(pending) if item[0] == expected), None)
-                        sent = pending.pop(index) if index is not None else None
-                        db.license_event(frame_id, payload, (sent[1], sent[2]) if sent else None, listener)
+                    enrich = None
+                    if (
+                        direction == "server_to_client"
+                        and frame[:1] == b"\x2f"
+                        and len(frame) >= 8
+                        and frame[7] in (FLEXLM_USER_ROW, FLEXLM_SEATS)
+                    ):
+                        feature = state["features"].get(session, (None, None))[0]
+                        if feature:
+                            enrich = {"feature": feature}
+                    frame_id, opcode, payload = db.frame(frame, segment, listener, direction, enrich)
+                    if payload is None:
+                        continue
+                    if "proto" not in payload:
+                        # SIM1 request/response correlation
+                        if direction == "client_to_server" and opcode in (3, 4):
+                            pending = requests.setdefault(session, [])
+                            if len(pending) < 128:
+                                pending.append((opcode, frame_id, payload))
+                        elif direction == "server_to_client" and opcode in (131, 132):
+                            pending = requests.get(session, [])
+                            expected = opcode & 0x7F
+                            index = next((i for i, item in enumerate(pending) if item[0] == expected), None)
+                            sent = pending.pop(index) if index is not None else None
+                            db.license_event(frame_id, payload, (sent[1], sent[2]) if sent else None, listener)
+                        continue
+                    _observe_flexlm(db, listener, session, direction, frame_id, payload, state)
                 if segment.fin or segment.rst:
                     for tail in stream.finish():
                         db.frame(tail, segment, listener, direction)
                     streams.pop(key, None)
                     if direction == "client_to_server":
                         requests.pop(session, None)
+                    state["features"].pop(session, None)
+                    state["identities"].pop(session, None)
+                    state["crypto_seen"].discard(session)
         finally:
             db.close()

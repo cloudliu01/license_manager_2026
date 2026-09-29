@@ -116,7 +116,9 @@ def _native_responder(service: SimulatorService, daemon: str):
                 if feature["daemon"] == daemon
             ]
             frames = [
-                (SEATS_TYPE, [str(feature["total"]), str(int(time.time()))])
+                (SEATS_TYPE, [
+                    str(feature["in_use"]), str(feature["total"]), str(int(time.time())),
+                ])
                 for feature in features
             ]
             frames.append((LISTING_TYPE, [_inventory_text(service, daemon)]))
@@ -155,7 +157,9 @@ def _usage_frames(
         return [], "UNKNOWN_FEATURE"
 
     rows = service.debug_checkouts(500, feature, daemon, "GRANTED")
-    frames = [
+    # Calibred 0x4e layout: [in_use, issued, epoch]
+    frames = [(SEATS_TYPE, [ str(len(rows)), str(definition["total"]), str(int(time.time())) ])]
+    frames.extend(
         (
             USER_TYPE,
             [
@@ -167,7 +171,7 @@ def _usage_frames(
             ],
         )
         for row in rows
-    ]
+    )
     return frames, ""
 
 

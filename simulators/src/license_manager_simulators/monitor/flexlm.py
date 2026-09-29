@@ -9,6 +9,7 @@ Decoding is heuristic: raw bytes stay authoritative in tcp_segments/frames.
 
 from __future__ import annotations
 
+import re
 import struct
 import time
 
@@ -16,6 +17,31 @@ DIRECTION_LABEL = {"client_to_server": "C->S", "server_to_client": "S->C"}
 LSF_MAGIC = 0x2F
 LSF_HEADER = 12
 TYPE_NAMES = {0x02: "REQ", 0x13: "RSP"}
+
+# Frame types with verified semantics (node0 captures, calibrated against
+# `lmstat -a` output): feature query, seat summary, per-user seat row, and
+# the final crypto-session handshake before encrypted payloads.
+FLEXLM_QUERY = 0x3C
+FLEXLM_SEATS = 0x4E
+FLEXLM_USER_ROW = 0x14
+FLEXLM_CRYPTO_READY = 0x61
+
+# Named string slots per C->S request type; types without an entry keep
+# their strings unnamed (their slots hold handles/binary, not identity).
+C_TO_S_NAMES = {
+    0x02: ["user", "host", "tty", "arch"],
+    0x08: ["user", "host", "daemon", "tty", "command"],
+}
+# Response types whose binary zones hold a meaningful port value; scanning
+# other types only yields false positives from binary noise.
+PORT_TYPES = {0x13}
+# Fixed-width greeting slots, stable across 134 captured node0 greetings.
+GREETING_FIELDS = {
+    4: "user", 25: "host", 58: "daemon", 69: "tty", 115: "pid", 126: "platform",
+}
+_HANDLE_RE = re.compile(r"[0-9A-F]{4}(?: [0-9A-F]{4}){3}")
+_TRAILING_NUMBER_RE = re.compile(r"(\d+)\s*$")
+_EPOCH_MIN = 1_500_000_000
 
 
 def lsf_declared(data: bytes) -> int:
@@ -52,14 +78,14 @@ def _header(raw: bytes) -> dict:
     }
 
 
-def strings_in(data: bytes) -> list[tuple[int, str]]:
+def strings_in(data: bytes, minlen: int = 2) -> list[tuple[int, str]]:
     out = []
     i = 0
     while i < len(data):
         j = i
         while j < len(data) and 0x20 <= data[j] < 0x7F:
             j += 1
-        if j - i >= 2 and (j == len(data) or data[j] == 0):
+        if j - i >= minlen and (j == len(data) or data[j] == 0):
             out.append((i, data[i:j].decode("ascii", "replace")))
         i = j + 1 if j > i else i + 1
     return out
@@ -113,16 +139,43 @@ def scan_ports(zone: bytes) -> list[int]:
     return candidates
 
 
+def _seat_fields(values: list[str]) -> dict:
+    """0x4e seat summary, calibrated 3-number layout [in_use, issued, epoch]
+    (node0, cross-checked against `lmstat -a`). Each number may carry binary
+    noise inside its token (e.g. "Nz100"); tokens without digits are dropped
+    before positional attribution. Degenerate variants keep their numbers
+    unattributed (no fabrication)."""
+    numbers = []
+    for value in values:
+        match = _TRAILING_NUMBER_RE.search(value)
+        if match:
+            numbers.append(int(match.group(1)))
+    out: dict = {}
+    if len(numbers) >= 3 and numbers[-1] >= _EPOCH_MIN:
+        out["in_use"] = numbers[0]
+        out["issued"] = numbers[1]
+        out["report_ts"] = numbers[-1]
+    else:
+        counts = [n for n in numbers if n < _EPOCH_MIN]
+        if counts:
+            out["counts"] = counts
+        epochs = [n for n in numbers if n >= _EPOCH_MIN]
+        if epochs:
+            out["report_ts"] = epochs[-1]
+    return out
+
+
 def decode_message(data: bytes, direction: str) -> dict:
     header = _header(data)
+    frame_type = header["type"]
     decoded = {
         "proto": "lsf-broker",
         "dir": direction,
         "magic": header["magic"],
         "len": header["declared"],
         "ver": header["ver"],
-        "type": header["type"],
-        "type_name": TYPE_NAMES.get(header["type"], f"0x{header['type']:02x}"),
+        "type": frame_type,
+        "type_name": TYPE_NAMES.get(frame_type, f"0x{frame_type:02x}"),
         "msg_ts": None
         if header["ts"] == 0
         else time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime(header["ts"])),
@@ -130,30 +183,48 @@ def decode_message(data: bytes, direction: str) -> dict:
     if header["ts"] == 0:
         decoded["msg_ts_note"] = "timestamp is 0 (request format carried no timestamp to echo)"
     if direction == "C->S":
-        # Request frames carry the string region from offset 22 (verified
-        # against captures); earlier offsets are the binary prologue.
-        names = ["user", "host", "tty", "name", "arch"]
-        runs = strings_in(data[22:])
+        # Request frames carry NUL-terminated strings after a fixed prologue.
+        # 0x3c feature queries start at offset 20 (name + optional key
+        # handle); other request types start at 22 (verified against captures).
+        start = 20 if frame_type == FLEXLM_QUERY else 22
+        runs = strings_in(data[start:])
         decoded["strings"] = [value for _, value in runs]
-        for index, (_, value) in enumerate(runs):
-            decoded[names[index] if index < len(names) else f"string_{index}"] = value
+        if frame_type == FLEXLM_QUERY:
+            if decoded["strings"]:
+                decoded["feature"] = decoded["strings"][0]
+            if len(decoded["strings"]) > 1:
+                candidate = decoded["strings"][1].strip()
+                if _HANDLE_RE.fullmatch(candidate):
+                    decoded["feature_handle"] = candidate
+        else:
+            names = C_TO_S_NAMES.get(frame_type, [])
+            for index, (_, value) in enumerate(runs):
+                if index < len(names):
+                    decoded[names[index]] = value
     else:
         tail = data[20:]
-        runs = strings_in(tail)
-        values = []
-        ip = None
-        for _, value in runs:
-            values.append(value)
-            if ip is None and looks_ipv4(value):
-                ip = value
+        # Seat summaries and user rows carry single-character fields (e.g.
+        # in_use 0..9); harvest them with minlen=1.
+        minlen = 1 if frame_type in (FLEXLM_USER_ROW, FLEXLM_SEATS) else 2
+        runs = strings_in(tail, minlen)
+        values = [value for _, value in runs]
         decoded["strings"] = values
+        ip = next((value for value in values if looks_ipv4(value)), None)
         if ip:
             decoded["server_ip"] = ip
-        candidates = []
-        for zone in zones_between(tail, runs):
-            candidates.extend(scan_ports(zone))
-        if candidates:
-            decoded["port_candidates"] = candidates
+        if frame_type == FLEXLM_USER_ROW:
+            for name, value in zip(("user", "host", "tty", "version"), values):
+                decoded[name] = value
+        elif frame_type == FLEXLM_SEATS:
+            decoded.update(_seat_fields(values))
+        if frame_type in PORT_TYPES:
+            candidates = []
+            for zone in zones_between(tail, runs):
+                candidates.extend(scan_ports(zone))
+            if len(candidates) == 1:
+                decoded["vendor_port"] = candidates[0]
+            elif candidates:
+                decoded["port_candidates"] = candidates[:8]
     return decoded
 
 
@@ -167,7 +238,7 @@ def decode_greeting(data: bytes, direction: str) -> dict:
             "no length field in this format; fields identified by content "
             "heuristics, strings harvested from the fixed-size message"
         ),
-        "strings": harvest(data, 2),
+        "strings": harvest(data[4:], 2),
     }
     if decoded["proto"] == "eda-greeting":
         fields = []
@@ -185,6 +256,10 @@ def decode_greeting(data: bytes, direction: str) -> dict:
             else:
                 pos += 1
         decoded["fields"] = fields
+        for field in fields:
+            name = GREETING_FIELDS.get(field["off"])
+            if name:
+                decoded[name] = field["value"]
     return decoded
 
 

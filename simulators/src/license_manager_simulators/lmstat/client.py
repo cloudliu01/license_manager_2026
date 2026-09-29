@@ -17,6 +17,7 @@ from license_manager_simulators.lmgrd.native import (
     END_TYPE,
     HELLO_TYPE,
     LISTING_TYPE,
+    QUERY_TYPE,
     SEATS_TYPE,
     ProtocolError,
     USER_TYPE,
@@ -53,13 +54,22 @@ class NativeSession:
     def command(
         self, command: str, argument: str = ""
     ) -> tuple[list[tuple[int, list[str]]], str]:
-        self.sock.sendall(
+        return self._exchange(
             native.encode_frame(
                 native.REQUEST_TYPE,
                 [getpass.getuser(), socket.getfqdn(), "lmgrd", "/dev/tty", command, argument],
                 client=True,
             )
         )
+
+    def query_feature(self, feature: str) -> tuple[list[tuple[int, list[str]]], str]:
+        '''
+        0x3c feature query, match the shape real lmstat traffic uses.
+        '''
+        return self._exchange(native.encode_frame(native.QUERY_TYPE, [feature], client=True))
+
+    def _exchange(self, payload: bytes) -> tuple[list[tuple[int, list[str]]], str]:
+        self.sock.sendall(payload)
         frames: list[tuple[int, list[str]]] = []
         while True:
             frame = native.recv_broker_frame(self.sock)
@@ -121,13 +131,14 @@ def _pid_from_tty(tty: str) -> int:
 
 def _collect_usage(session: NativeSession, feature: dict) -> list[dict]:
     rows: list[dict] = []
-    frames, error = session.command("usage", feature["feature"])
+    frames, error = session.query_feature(feature["feature"])
     if error:
         return rows
     for frame_type, strings in frames:
-        if frame_type == SEATS_TYPE and strings:
+        if frame_type == SEATS_TYPE and len(strings) >= 2:
             try:
-                feature["total"] = int(strings[0])
+                # Calibred 0x4e layout: [in_use, issued, epoch].
+                feature["total"] = int(strings[1])
             except ValueError:
                 continue
         elif frame_type == USER_TYPE and len(strings) >= 5:

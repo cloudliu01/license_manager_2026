@@ -214,7 +214,10 @@ def _usage_frames(
             if row.get("status") in ("GRANTED", "QUEUED")]
     except WorkerUnavailable:
         return [], "UNKNOWN_DAEMON"
-    frames = [(SEATS_TYPE, [str(definition.total), str(int(datetime.now(UTC).timestamp()))])]
+    in_use = sum(1 for row in rows if row.get("status") == "GRANTED")
+    frames = [(SEATS_TYPE, [
+        str(in_use), str(definition.total), str(int(datetime.now(UTC).timestamp()))
+    ])]
     for row in rows:
         frames.append((USER_TYPE, [
             row["user"], row["host"], f"/dev/pts/{row.get('pid', 0)}", "1.0", row["status"],

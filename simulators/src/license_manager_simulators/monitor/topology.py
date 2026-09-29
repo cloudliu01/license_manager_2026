@@ -33,7 +33,7 @@ def _listener_inodes() -> dict[int, int]:
 
 def _daemon_name(pid: int) -> str | None:
     """Simulator worker daemons carry the feature name after the worker marker;
-    real FlexLM vendor daemons (e.g. empyrean) fall back to their argv[0] base
+    real FlexLM vendor daemons (e.g. vendor00) fall back to their argv[0] base
     name so listeners stay attributable.
     """
     try:

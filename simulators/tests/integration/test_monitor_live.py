@@ -101,6 +101,18 @@ def test_monitor_decodes_native_style_lmstat_traffic(tmp_path):
                 WHERE decode_status='FLEXLM_DECODED'
                 AND decoded_json LIKE '%alpha%' LIMIT 3""").fetchall()
             assert any('"strings"' in row[1] or '"fields"' in row[1] for row in flex_rows)
+            # The native lmstat query path must feed FlexLM license events with
+            # the stream-context feature attribution.
+            events = conn.execute("""SELECT status, feature, client_user FROM license_events
+                WHERE status IN ('FLEXLM_FEATURE_SUMMARY', 'FLEXLM_IN_USE')""").fetchall()
+            assert any(
+                status == "FLEXLM_FEATURE_SUMMARY" and feature == "alpha"
+                for status, feature, _ in events
+            )
+            assert any(
+                status == "FLEXLM_IN_USE" and feature == "alpha" and client_user == "native_probe"
+                for status, feature, client_user in events
+            )
     finally:
         if monitor is not None:
             children = Path(f"/proc/{monitor.pid}/task/{monitor.pid}/children")

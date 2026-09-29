@@ -1,8 +1,31 @@
-"""Native-style FlexLM wire, transcribed from annotated captures.
+"""Native-style FlexLM wire, transcribed from annotated node0 captures.
+
+The captured server exchanges three frame families (see monitor/flexlm.py):
+- EDA greeting: fixed 147 bytes, head ``68 ?? "13"``, NUL-separated fields
+  user, host, daemon, tty, pid, platform; the server answers with a broker
+  HELLO (0x0e) echoing the client host and daemon name.
+- lmgrd ping/keepalive: fixed 147 bytes, head ``3c ?? 30 00`` (client) and
+  ``3e ?? 30 00`` (server), ASCII "0" at offset 12.
+- Broker frames: ``2f`` + 3 session bytes, u16be declared total length
+  (12-byte header included), version byte (0 for SEATS, 1 otherwise),
+  type byte, u32be Unix timestamp, then the payload: 8 zero bytes, a short
+  binary prologue (0104 on requests, 0b0d0104 00 on responses) and
+  NUL-terminated strings. Client strings start at offset 22, server strings
+  at offset 20-25; the trailing region is what the monitor decodes.
+
+Message types used by the status surface (readable strings on the wire):
+    0x08 REQUEST  client -> server [user, host, daemon, tty, command]
+    0x0e HELLO    server -> client [client_host, daemon]
+    0x46 LISTING  server -> client [multi-line text or path]
+    0x4e SEATS    server -> client [str(total), str(unix_ts)]
+    0x14 USER     server -> client [user, host, tty, version, status]
+    0x13 END      server -> client terminator
 
 This is a capture-derived status-surface simulation, not a claim of general
-FlexNet wire compatibility. The session-crypto handshake is intentionally
-omitted; encrypted key payloads are not reproduced.
+FlexNet wire compatibility. The FlexLM session-crypto handshake (observed
+0x41/0x47/0x55/0x56/0x3d/0x61) is intentionally omitted: the simulator
+answers without a challenge, and encrypted key payloads cannot be reproduced
+faithfully.
 """
 
 from __future__ import annotations
@@ -18,6 +41,7 @@ GREETING_SIZE = 147
 PING_SIZE = 147
 BROKER_HEADER = 12
 REQUEST_TYPE = 0x08
+QUERY_TYPE = 0x3C
 HELLO_TYPE = 0x0E
 LISTING_TYPE = 0x46
 SEATS_TYPE = 0x4E
@@ -189,9 +213,18 @@ def serve_native(
 ) -> None:
     """Greeting/ping/command loop for one native-style connection.
 
-    ``responder(command, argument)`` returns ``(frames, error)``; ``frames`` is
-    a list of ``(message_type, strings)`` pairs. An END frame always terminates
-    each command response; its string is empty on success or contains the error.
+    ``responder(command, argument)`` returns ``(frames, error)`` where
+    ``frames`` is a list of ``(type, strings)``; the server always terminates a
+    response with an END frame carrying the error string (empty on success).
+    HELLO echoes the server's resolution of the client peer address plus the
+    daemon name, as observed for both lmgrd and vendor-daemon ports in the
+    annotated captures.
+
+    Per-type request shapes (verfied against real captures): ``0x08`` REQUEST carries 
+     ``[user, host, daemon, tty, command, argument]``; ``0x3c`` is a feature query 
+     ``[feature]`` dispatched as the ``usage`` command; Seat summaries follow the 
+     calibrated ``[in_use, issued, epoch]`` layout. the session-crypto handshake stays
+     ommited, and the 0x14 status column remains a simulator extension.
     """
     with connection:
         connection.settimeout(10)
@@ -223,10 +256,13 @@ def serve_native(
                 if frame is None:
                     return
                 message_type, strings, _timestamp = frame
-                if message_type != REQUEST_TYPE or not strings:
+                if message_type == QUERY_TYPE and strings:
+                    command, argument = "usage", strings[0]
+                elif message_type == REQUEST_TYPE and strings:
+                    command = strings[4] if len(strings) > 4 else ""
+                    argument = strings[5] if len(strings) > 5 else ""
+                else:
                     return
-                command = strings[4] if len(strings) > 4 else ""
-                argument = strings[5] if len(strings) > 5 else ""
                 frames, error = responder(command, argument)
                 for reply_type, reply_strings in frames:
                     send_frame(
