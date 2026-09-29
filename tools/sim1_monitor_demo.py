@@ -46,31 +46,77 @@ def _wait(predicate, timeout: float = 10) -> None:
     raise TimeoutError("demo service/monitor not ready")
 
 
-def _stop(data: dict) -> None:
-    if data.get("capture_pid"):
-        subprocess.run(["sudo", "-n", "kill", "-TERM", str(data["capture_pid"])], check=False)
-    if data.get("manager_pid"):
+def _matches(pid: int, module: str, path: Path) -> bool:
+    """Do not signal a PID reused since the demo manifest was written."""
+    try:
+        args = Path(f"/proc/{pid}/cmdline").read_bytes().split(b"\0")
+    except (FileNotFoundError, PermissionError):
+        return False
+    return b"-m" in args and module.encode() in args and str(path).encode() in args
+
+
+def _stop(data: dict, output: Path) -> None:
+    capture_pid = data.get("capture_pid")
+    manager_pid = data.get("manager_pid")
+    targets = [
+        (capture_pid, "license_manager_simulators.monitor.cli", output / "capture.sqlite"),
+        (manager_pid, "license_manager_simulators.lmgrd.cli", output / "license.dat"),
+    ]
+    if capture_pid and _matches(*targets[0]):
+        subprocess.run(["sudo", "-n", "kill", "-TERM", str(capture_pid)], check=True)
+    if manager_pid and _matches(*targets[1]):
         try:
-            os.kill(data["manager_pid"], signal.SIGTERM)
+            os.kill(manager_pid, signal.SIGTERM)
         except ProcessLookupError:
             pass
+    deadline = time.monotonic() + 8
+    while any(pid and _matches(pid, module, path) for pid, module, path in targets):
+        if time.monotonic() >= deadline:
+            raise TimeoutError("demo services did not stop; inspect the recorded PIDs")
+        time.sleep(0.1)
+
+
+def _stop_launched(server: subprocess.Popen, monitor: subprocess.Popen | None) -> None:
+    if monitor is not None and monitor.poll() is None:
+        # sudo does not necessarily forward SIGTERM to the privileged child.
+        child_file = Path(f"/proc/{monitor.pid}/task/{monitor.pid}/children")
+        children = child_file.read_text().split() if child_file.exists() else []
+        for pid in children:
+            subprocess.run(["sudo", "-n", "kill", "-TERM", pid], check=False)
+        if not children:
+            monitor.terminate()
+        try:
+            monitor.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            for pid in children:
+                subprocess.run(["sudo", "-n", "kill", "-KILL", pid], check=False)
+            monitor.kill()
+            monitor.wait(timeout=5)
+    if server.poll() is None:
+        server.terminate()
+        try:
+            server.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            server.kill()
+            server.wait(timeout=5)
 
 
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--out", type=Path, default=ROOT / "artifacts" / "sim1-monitor-demo")
     parser.add_argument("--stop", action="store_true")
+    parser.add_argument("--keep-running", action="store_true", help="leave verified services running")
     args = parser.parse_args()
     output = args.out.resolve()
     manifest = output / "run.json"
     if args.stop:
-        _stop(json.loads(manifest.read_text()))
-        print("sent SIGTERM to SIM1 monitor and lmgrd")
+        _stop(json.loads(manifest.read_text()), output)
+        print("matching SIM1 monitor and lmgrd stopped")
         return 0
     subprocess.run(["sudo", "-n", "true"], check=True)
     if manifest.exists():
         old = json.loads(manifest.read_text())
-        if Path(f"/proc/{old['manager_pid']}").exists():
+        if _matches(old["manager_pid"], "license_manager_simulators.lmgrd.cli", output / "license.dat"):
             raise RuntimeError("previous demo still running; use --stop first")
     output.mkdir(parents=True, exist_ok=True)
     for name in ("capture.sqlite", "capture.sqlite-wal", "capture.sqlite-shm", "monitor.ready"):
@@ -97,6 +143,7 @@ def main() -> int:
             env=env, stdout=stdout, stderr=subprocess.STDOUT, start_new_session=True,
         )
         monitor = None
+        keep_running = False
         try:
             def server_ready() -> bool:
                 if server.poll() is not None:
@@ -184,18 +231,15 @@ def main() -> int:
             print(f"verified 4 decoded license events and raw hex/BLOB in {db_path}")
             print(f"manager PID/port {server.pid}/{manager}; vend_a {a['pid']}/{a['port']}; "
                   f"vend_b {b['pid']}/{b['port']}; monitor PID {capture_pid}")
-            print(f"services left running; stop with: {sys.executable} {__file__} --out {output} --stop")
+            if args.keep_running:
+                print(f"services left running; stop with: {sys.executable} {__file__} --out {output} --stop")
+                keep_running = True
+            else:
+                print("stopping verified demo services")
             return 0
-        except BaseException:
-            if monitor is not None and monitor.poll() is None:
-                child = Path(f"/proc/{monitor.pid}/task/{monitor.pid}/children")
-                if child.exists():
-                    for pid in child.read_text().split():
-                        subprocess.run(["sudo", "-n", "kill", "-TERM", pid], check=False)
-                else:
-                    monitor.terminate()
-            server.terminate()
-            raise
+        finally:
+            if not keep_running:
+                _stop_launched(server, monitor)
 
 
 if __name__ == "__main__":

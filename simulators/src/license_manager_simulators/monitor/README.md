@@ -68,9 +68,11 @@ FlexLM 侧的 `license_events` 由同流上下文生成：0x3c 特性查询（�
 
 ```bash
 python tools/sim1_monitor_demo.py
-# 运行结束后模拟器和监控仍在后台：
+# 运行结束后自动停止模拟器和监控；数据库仍可查询：
 sqlite3 artifacts/sim1-monitor-demo/capture.sqlite \
   'SELECT feature,client_user,status FROM license_events ORDER BY id;'
+# 若要保留服务用于调试：
+python tools/sim1_monitor_demo.py --keep-running
 python tools/sim1_monitor_demo.py --stop
 ```
 
@@ -87,4 +89,4 @@ RUN_RAW_CAPTURE_TEST=1 python -m pytest -q \
 - SIM1 帧之外，真实 FlexNet 私有/加密载荷只做**启发式解码**（LSF-style broker 分帧 + 字符串收割）：字符串内容（feature、user@host、席位）可能可见；二进制字段不解释；未组成完整帧的 payload 仍保留在 `tcp_segments` 中，可用改进后的解码器对旧数据重放。`license_events` 仍只记录 SIM1 checkout/checkin 应答，FlexLM 帧不参与事件关联。
 - 真实 FlexLM 服务器 fork 出的 vendor daemon 与 lmgrd **共享持有监听 socket**：`listeners` 表中共享端口归属记录为 manager PID（先发现者），daemon 名在子进程独占端口时才可见。
 - 默认本机 loopback，原始 SQLite 中包含真实用户、主机及报文字节，妥善限制文件访问。抓真实服务器时建议在**回环接口**（`lo`）或专门指定的业务网卡上运行；繁忙服务器上的 `--iface` 全量抓包没有内核 BPF 过滤，会消耗较多 CPU。演示产物中的 SQLite/run.json 已加入 `.gitignore`，不要提交生产抓包。
-- 前台运行时 `Ctrl-C` 停止监控；后台一键演示用 `tools/sim1_monitor_demo.py --stop`。请勿让两个监控实例同时写同一个 SQLite 文件。
+- 前台运行时 `Ctrl-C` 停止监控；一键演示默认自动停止服务，仅 `--keep-running` 会保留后台进程（用 `tools/sim1_monitor_demo.py --stop` 结束）。请勿让两个监控实例同时写同一个 SQLite 文件。
