@@ -11,6 +11,7 @@ from __future__ import annotations
 import getpass
 import os
 import socket
+import time
 
 from license_manager_simulators.lmgrd import native
 from license_manager_simulators.lmgrd.native import (
@@ -67,6 +68,27 @@ class NativeSession:
         0x3c feature query, match the shape real lmstat traffic uses.
         '''
         return self._exchange(native.encode_frame(native.QUERY_TYPE, [feature], client=True))
+
+    def checkout(self, feature: str) -> None:
+        """Native checkout exchange (0x41/0x47/0x55/0x56/0x3d/0x61). The
+        feature rides xor-obfuscated in the 0x41 slot (real traffic keeps it
+        inside the encrypted payload). The server records the checkout with
+        the client's 0x3d epoch as the seat start time, mirroring verified
+        real-server behavior."""
+        self.sock.sendall(native.encode_frame(
+            native.PARAMS_TYPE, [native.xor_hex(feature)], client=True))
+        frame = native.recv_broker_frame(self.sock)
+        if frame is None or frame[0] != native.CRYPTO_RESPONSE_TYPE:
+            raise ProtocolError("NO_CRYPTO_RESPONSE")
+        self.sock.sendall(native.encode_frame(
+            native.DAEMON_HANDSHAKE_TYPE, [native.DAEMON_NAME], client=True))
+        frame = native.recv_broker_frame(self.sock)
+        if frame is None or frame[0] != native.GRANT_TYPE:
+            raise ProtocolError("NO_GRANT")
+        self.sock.sendall(native.encode_checkout_request(int(time.time())))
+        frame = native.recv_broker_frame(self.sock)
+        if frame is None or frame[0] != native.CHECKOUT_RETURN_TYPE:
+            raise ProtocolError("NO_CHECKOUT_RETURN")
 
     def _exchange(self, payload: bytes) -> tuple[list[tuple[int, list[str]]], str]:
         self.sock.sendall(payload)

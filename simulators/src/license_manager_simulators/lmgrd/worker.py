@@ -12,7 +12,7 @@ import socket
 import sys
 import time
 from dataclasses import asdict
-from datetime import datetime
+from datetime import UTC, datetime
 from threading import Lock, Thread
 
 from license_manager_simulators.core.license_parser import parse_license_file
@@ -169,16 +169,81 @@ def _usage_frames(
                 "1.0",
                 row["status"],
             ],
+            _seat_row_tail(row),
         )
         for row in rows
     )
     return frames, ""
 
 
+def _seat_row_tail(row: dict) -> bytes:
+    """0x14 binary tail with the seat's start epoch and checkout number; a
+    checkout without a grant time (QUEUED rows upstream) keeps the tail-less
+    legacy shape the monitor leaves unattributed."""
+    start_epoch = native.iso_epoch(row.get("granted_at"))
+    if start_epoch is None:
+        return b""
+    return native.seat_tail(start_epoch, native.checkout_num(row["checkout_id"]))
+
+
+def _native_checkout(service: SimulatorService) -> native.CheckoutHandler:
+    """Record a checkout from the 0x3d exchange and return the outcome for
+    the client-readable result trailer. The client's request timestamp
+    becomes the seat start epoch (verified real-server behavior) so the
+    monitor's checkout-timestamp join lines up exactly."""
+
+    def checkout(feature: str, greeting: dict[str, str | int], ts: int) -> dict:
+        result = service.checkout(
+            feature,
+            str(greeting.get("user", "")),
+            str(greeting.get("host", "")),
+            int(greeting.get("pid", 0) or 0),
+            allow_queue=True,
+            granted_at=datetime.fromtimestamp(ts, tz=UTC),
+        )
+        return {
+            "status": result.status,
+            "reason": result.reason,
+            "checkout_id": result.checkout_id,
+            "feature": result.feature,
+            "total": result.total,
+            "in_use": result.in_use,
+            "queued": result.queued,
+        }
+
+    return checkout
+
+
+def _native_checkin(service: SimulatorService) -> native.CheckinHandler:
+    """Release a seat from the 0x49 checkin (checkout id in the first
+    string slot, mirroring the opaque handles real checkins carry)."""
+
+    def checkin(checkout_id: str) -> dict:
+        if not service.has_checkout(checkout_id):
+            return {"status": "REJECTED", "reason": "UNKNOWN_CHECKOUT",
+                    "checkout_id": None, "feature": None}
+        result = service.return_checkout(checkout_id)
+        return {
+            "status": result.status,
+            "reason": result.reason,
+            "checkout_id": result.checkout_id,
+            "feature": result.feature,
+            "total": result.total,
+            "in_use": result.in_use,
+            "queued": result.queued,
+        }
+
+    return checkin
+
+
 def _serve_native_connection(
     connection: socket.socket, service: SimulatorService, daemon: str
 ) -> None:
-    serve_native(connection, daemon, _native_responder(service, daemon))
+    serve_native(
+        connection, daemon, _native_responder(service, daemon),
+        checkout_handler=_native_checkout(service),
+        checkin_handler=_native_checkin(service),
+    )
 
 
 def _serve(

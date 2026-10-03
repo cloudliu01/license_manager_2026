@@ -63,7 +63,11 @@ class SimulatorService:
         quantity: int = 1,
         info: str | None = None,
         allow_queue: bool = True,
+        granted_at: datetime | None = None,
     ) -> CheckoutResult:
+        """``granted_at`` overrides the server clock for the seat start time:
+        the native 0x3d checkout exchange passes the client's request epoch
+        (verified real-server behavior ties the seat start to that value)."""
         with self._lock:
             now = datetime.now(UTC)
             if quantity < 1:
@@ -130,7 +134,7 @@ class SimulatorService:
                     info,
                     "GRANTED",
                     now,
-                    now,
+                    granted_at or now,
                 )
                 current = self.store.get_feature(feature_name)
                 result = CheckoutResult(

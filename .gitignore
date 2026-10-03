@@ -16,8 +16,4 @@ dist/
 *.tmp
 *.swp
 # Captures may contain user/host data and raw network bytes. Keep them local.
-artifacts/**/capture.sqlite*
-artifacts/**/run.json
-artifacts/**/monitor.ready
-artifacts/**/*.out
-artifacts/**/license.dat
+artifacts/*

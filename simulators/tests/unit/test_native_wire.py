@@ -17,6 +17,11 @@ def test_greeting_round_trip_and_monitor_compat():
     assert decoded["proto"] == "eda-greeting"
     # The passive decoder identifies greeting fields from offset 4.
     assert [field["value"] for field in decoded["fields"][:2]] == ["alice", "client.example.com"]
+    # Fixed real-layout slots: the monitor must recover every identity field.
+    assert (decoded["user"], decoded["host"], decoded["daemon"]) == (
+        "alice", "client.example.com", "vend")
+    assert (decoded["tty"], decoded["pid"], decoded["platform"]) == (
+        "/dev/tty", "4242", "x64_lsb")
 
 
 def test_ping_layout_matches_capture():
@@ -104,6 +109,107 @@ def test_frame_rejects_bad_declared_length():
         assert "INVALID_LENGTH" in str(exc)
     else:
         raise AssertionError("expected ProtocolError")
+
+
+def test_seat_tail_roundtrip_through_monitor_decoder():
+    tail = native.seat_tail(1790866419, 0x814E)
+    row = native.encode_frame(
+        native.USER_TYPE, ["bob", "hostB", "/dev/pts/9", "1.0", "GRANTED"],
+        client=False, tail=tail,
+    )
+    assert len(row[-8:-4]) == 4 and row[-8:-4] == b"\x00\x00\x00\x00"
+    # monitor promotion: start epoch + checkout id from the verified tail
+    ftype, decoded = decode_flexlm_frame(row, "server_to_client")
+    assert (ftype, decoded["start_ts"], decoded["checkout_id"]) == (0x14, 1790866419, 0x814E)
+    assert decoded["user"] == "bob" and decoded["tty"] == "/dev/pts/9"
+    # lmstat client parsing: the named fields survive the trailing binary
+    message_type, strings, _ = native.decode_frame(row)
+    assert message_type == native.USER_TYPE
+    assert strings[:5] == ["bob", "hostB", "/dev/pts/9", "1.0", "GRANTED"]
+
+
+def test_checkout_num_stable():
+    first = native.checkout_num("6f1a2b3c-0000-4000-8000-000000000001")
+    assert first == native.checkout_num("6f1a2b3c-0000-4000-8000-000000000001")
+    assert 0 <= first <= 0xFFFFFFFF
+    assert native.checkout_num("not-a-uuid") == native.checkout_num("not-a-uuid")
+
+
+def test_checkout_request_promotes_client_epoch():
+    import time
+
+    ts = int(time.time())
+    raw = native.encode_checkout_request(ts)
+    assert len(raw) == native.CHECKOUT_REQ_FRAME_SIZE
+    ftype, decoded = decode_flexlm_frame(raw, "client_to_server")
+    assert ftype == native.CHECKOUT_REQ_TYPE
+    assert decoded["checkout_ts"] == ts
+
+
+def test_serve_native_checkout_exchange():
+    import threading
+
+    recorded = []
+
+    def handler(feature, greeting, ts):
+        recorded.append((feature, dict(greeting), ts))
+
+    def responder(command, argument):
+        return [
+            (native.SEATS_TYPE, ["1", "5", "1790533012"]),
+            (native.USER_TYPE, ["bob", "hostB", "/dev/pts/9", "1.0", "GRANTED"],
+             native.seat_tail(1790866419, 77)),
+        ], ""
+
+    server, client = socket.socketpair()
+    thread = threading.Thread(
+        target=native.serve_native,
+        args=(server, "vend", responder),
+        kwargs={"checkout_handler": handler},
+        daemon=True,
+    )
+    thread.start()
+    try:
+        client.settimeout(2)
+        client.sendall(native.encode_greeting("alice", "hA", "vend", "/dev/tty", 42, "x64_lsb"))
+        hello = native.recv_broker_frame(client)
+        assert hello is not None and hello[0] == native.HELLO_TYPE
+
+        ts = 1790866419
+        client.sendall(native.encode_frame(native.PARAMS_TYPE, ["alpha"], client=True))
+        reply = native.recv_broker_frame(client)
+        assert reply is not None and reply[0] == native.CRYPTO_RESPONSE_TYPE
+        client.sendall(native.encode_frame(
+            native.DAEMON_HANDSHAKE_TYPE, [native.DAEMON_NAME], client=True))
+        reply = native.recv_broker_frame(client)
+        assert reply is not None and reply[0] == native.GRANT_TYPE
+        client.sendall(native.encode_checkout_request(ts))
+        reply = native.recv_broker_frame(client)
+        assert reply is not None and reply[0] == native.CHECKOUT_RETURN_TYPE
+        assert recorded == [("alpha", {"user": "alice", "host": "hA", "daemon": "vend",
+                                      "tty": "/dev/tty", "pid": 42, "platform": "x64_lsb"}, ts)]
+
+        # the usage responder's 0x14 row carries the verified binary tail:
+        # raw-read it and confirm via the monitor decoder
+        client.sendall(native.encode_frame(native.QUERY_TYPE, ["alpha"], client=True))
+        seats = native.recv_broker_frame(client)
+        assert seats is not None and seats[0] == native.SEATS_TYPE
+        header = b""
+        while len(header) < 12:
+            header += client.recv(12 - len(header))
+        declared = struct.unpack_from("!H", header, 4)[0]
+        rest = b""
+        while len(rest) < declared - 12:
+            rest += client.recv(declared - 12 - len(rest))
+        ftype, decoded = decode_flexlm_frame(header + rest, "server_to_client")
+        assert ftype == native.USER_TYPE
+        assert decoded["start_ts"] == ts and decoded["checkout_id"] == 77
+        end = native.recv_broker_frame(client)
+        assert end is not None and end[0] == native.END_TYPE
+    finally:
+        client.close()
+        server.close()
+        thread.join(timeout=2)
 
 
 def test_serve_native_greeting_ping_and_usage(tmp_path):

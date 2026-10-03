@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import hashlib
 import socket
+import struct
 from datetime import UTC, date, datetime
 from threading import Event, Thread
 from uuid import uuid4
@@ -219,9 +220,14 @@ def _usage_frames(
         str(in_use), str(definition.total), str(int(datetime.now(UTC).timestamp()))
     ])]
     for row in rows:
+        start_epoch = native.iso_epoch(row.get("granted_at"))
+        tail = (
+            native.seat_tail(start_epoch, native.checkout_num(row["checkout_id"]))
+            if start_epoch is not None else b""
+        )
         frames.append((USER_TYPE, [
             row["user"], row["host"], f"/dev/pts/{row.get('pid', 0)}", "1.0", row["status"],
-        ]))
+        ], tail))
     return frames, ""
 
 
@@ -237,8 +243,35 @@ def _native_responder(
             return [(LISTING_TYPE, [_inventory_text(config)])], ""
         if command == "usage":
             return _usage_frames(config, group, argument)
+        if command in ("route", "find"):
+            return _route_frame(config, group, command, argument)
         return [], "UNKNOWN_COMMAND"
     return respond
+
+
+def _route_frame(
+    config: LicenseConfig, group: ProcessGroup, command: str, argument: str,
+) -> tuple[list[tuple[int, list[str]]], str]:
+    """0x13 redirect with the vendor port in the binary zone – the shape
+    real lmgrd uses to hand clients off to a vendor daemon (the monitor's
+    PORT_TYPES scan decodes exactly this). The "PORT" marker string keeps
+    the success reply unambiguous against error ENDs, whose length varies
+    with the error text."""
+    if command == "route":
+        feature = config.features.get(argument)
+        if feature is None:
+            return [], "UNKNOWN_FEATURE"
+        name = feature.daemon
+    else:
+        found = [vendor for vendor, worker in group.workers.items()
+                 if worker.request("find", checkout_id=argument).get("found")]
+        if len(found) != 1:
+            return [], "UNKNOWN_CHECKOUT"
+        name = found[0]
+    worker = group.workers.get(name)
+    if worker is None or worker.process.poll() is not None:
+        return [], "UNKNOWN_DAEMON"
+    return [(native.END_TYPE, ["PORT"], struct.pack("!H", worker.port))], ""
 
 
 def _serve_native(

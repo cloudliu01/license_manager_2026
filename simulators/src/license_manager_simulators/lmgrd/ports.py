@@ -36,6 +36,9 @@ class PortReservation:
 
 def _bind(host: str, port: int) -> socket.socket:
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    # TIME_WAIT remnants from closed connections must not block a re-bind
+    # (SO_REUSEADDR does not permit stealing an ACTIVE listener).
+    sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     try:
         sock.bind((host, port))
         sock.listen(socket.SOMAXCONN)

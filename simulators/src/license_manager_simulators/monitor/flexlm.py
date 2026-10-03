@@ -20,11 +20,25 @@ TYPE_NAMES = {0x02: "REQ", 0x13: "RSP"}
 
 # Frame types with verified semantics (node0 captures, calibrated against
 # `lmstat -a` output): feature query, seat summary, per-user seat row, and
-# the final crypto-session handshake before encrypted payloads.
+# the final crypto-session handshake before encrypted payloads. The
+# encrypted-session license lookup is type 0x47 C->S (the feature name is in
+# clear after an 8-byte prologue; S->C 0x47 is the crypto response, so
+# direction disambiguates) and its 0x46 S->C response echoes the full
+# INCREMENT license line.
 FLEXLM_QUERY = 0x3C
 FLEXLM_SEATS = 0x4E
 FLEXLM_USER_ROW = 0x14
 FLEXLM_CRYPTO_READY = 0x61
+FLEXLM_LICENSE_LOOKUP = 0x47
+FLEXLM_LICENSE_LINE = 0x46
+# vendor daemon -> client hello on its own connection: [client host, daemon name]
+FLEXLM_DAEMON_HELLO = 0x0E
+# C->S encrypted-checkout request (its 0x61 S->C response is CRYPTO_READY);
+# carries the client's epoch time as 8 hex chars. Verified equal to the
+# start epoch in the poller's 0x14 seat rows (qa-ls: userx/qa-srv47 QZ
+# 14:10:52, sample.user/qa-gui32 DEMO 14:53:39/41), which ties an encrypted
+# checkout to its seat without any identity join.
+FLEXLM_CHECKOUT_REQ = 0x3D
 
 # Named string slots per C->S request type; types without an entry keep
 # their strings unnamed (their slots hold handles/binary, not identity).
@@ -42,6 +56,17 @@ GREETING_FIELDS = {
 _HANDLE_RE = re.compile(r"[0-9A-F]{4}(?: [0-9A-F]{4}){3}")
 _TRAILING_NUMBER_RE = re.compile(r"(\d+)\s*$")
 _EPOCH_MIN = 1_500_000_000
+# 0x3d checkout request: first string slot is the client epoch as 8 hex chars
+_CHECKOUT_TS_RE = re.compile(r"[0-9a-f]{8}")
+# 0x46 response line: "<prefix tokens> INCREMENT <feature> <vendor> <version>
+# <expiry> <seats> SIGN=\"...\"" (verified: "25b4760 200 500 INCREMENT QZ
+# vendmock 1.0 31-dec-2026 500 SIGN=\"0267 03FB E0BE 092D\" ...").
+_INCREMENT_RE = re.compile(
+    r"INCREMENT\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\d+)"
+)
+# 0x47 lookups ride crypto sessions; a binary frame misread as a lookup must
+# not promote garbage as a feature name.
+_FEATURE_NAME_RE = re.compile(r"[A-Za-z][A-Za-z0-9_.\-]*")
 
 
 def lsf_declared(data: bytes) -> int:
@@ -165,6 +190,23 @@ def _seat_fields(values: list[str]) -> dict:
     return out
 
 
+def _license_fields(text: str) -> dict:
+    """Parse the INCREMENT license line carried by 0x46 responses."""
+    out: dict = {}
+    match = _INCREMENT_RE.search(text)
+    if match:
+        feature, vendor, version, expiry, seats = match.groups()
+        out["feature"] = feature
+        out["vendor"] = vendor
+        out["version"] = version
+        out["expiry"] = expiry
+        out["seats"] = int(seats)
+    sign = re.search(r'SIGN="([^"]+)"', text)
+    if sign:
+        out["sign"] = sign.group(1)
+    return out
+
+
 def decode_message(data: bytes, direction: str) -> dict:
     header = _header(data)
     frame_type = header["type"]
@@ -184,23 +226,38 @@ def decode_message(data: bytes, direction: str) -> dict:
         decoded["msg_ts_note"] = "timestamp is 0 (request format carried no timestamp to echo)"
     if direction == "C->S":
         # Request frames carry NUL-terminated strings after a fixed prologue.
-        # 0x3c feature queries start at offset 20 (name + optional key
-        # handle); other request types start at 22 (verified against captures).
-        start = 20 if frame_type == FLEXLM_QUERY else 22
+        # 0x3c feature queries and 0x47 license lookups start at offset 20
+        # (8-byte prologue); other request types start at 22 (verified against
+        # captures).
+        start = 20 if frame_type in (FLEXLM_QUERY, FLEXLM_LICENSE_LOOKUP) else 22
         runs = strings_in(data[start:])
         decoded["strings"] = [value for _, value in runs]
-        if frame_type == FLEXLM_QUERY:
+        if frame_type in (FLEXLM_QUERY, FLEXLM_LICENSE_LOOKUP):
             if decoded["strings"]:
-                decoded["feature"] = decoded["strings"][0]
-            if len(decoded["strings"]) > 1:
+                candidate = decoded["strings"][0]
+                if (
+                    frame_type == FLEXLM_QUERY
+                    or _FEATURE_NAME_RE.fullmatch(candidate)
+                ):
+                    decoded["feature"] = candidate
+            if len(decoded["strings"]) > 1 and "feature" in decoded:
                 candidate = decoded["strings"][1].strip()
-                if _HANDLE_RE.fullmatch(candidate):
+                if frame_type == FLEXLM_LICENSE_LOOKUP:
+                    # 0x47 second slot is a "P:<id>" parameter, not a handle.
+                    decoded["param"] = candidate
+                elif _HANDLE_RE.fullmatch(candidate):
                     decoded["feature_handle"] = candidate
         else:
             names = C_TO_S_NAMES.get(frame_type, [])
             for index, (_, value) in enumerate(runs):
                 if index < len(names):
                     decoded[names[index]] = value
+        if frame_type == FLEXLM_CHECKOUT_REQ and decoded["strings"]:
+            candidate = decoded["strings"][0]
+            if _CHECKOUT_TS_RE.fullmatch(candidate):
+                checkout_ts = int(candidate, 16)
+                if _EPOCH_MIN <= checkout_ts <= time.time() + 86400:
+                    decoded["checkout_ts"] = checkout_ts
     else:
         tail = data[20:]
         # Seat summaries and user rows carry single-character fields (e.g.
@@ -215,8 +272,28 @@ def decode_message(data: bytes, direction: str) -> dict:
         if frame_type == FLEXLM_USER_ROW:
             for name, value in zip(("user", "host", "tty", "version"), values):
                 decoded[name] = value
+            # Verified tail (qa-ls, cross-checked against `lmstat -f`):
+            # after the strings: 4B pad, 4B flag, 4B start epoch (BE),
+            # 4B zero pad, 4B checkout id (BE). The lmstat "(qa-ls/59001
+            # 49202)" handle is this id. Promote only on the verified
+            # padding pattern; unknown variants stay unattributed.
+            if (
+                len(data) >= 20
+                and data[-8:-4] == b"\x00\x00\x00\x00"
+            ):
+                start_ts = struct.unpack_from("!I", data, len(data) - 12)[0]
+                if start_ts >= _EPOCH_MIN:
+                    decoded["start_ts"] = start_ts
+                    decoded["checkout_id"] = struct.unpack_from("!I", data, len(data) - 4)[0]
         elif frame_type == FLEXLM_SEATS:
             decoded.update(_seat_fields(values))
+        elif frame_type == FLEXLM_LICENSE_LINE:
+            line = next((v for v in values if "INCREMENT" in v), None)
+            if line:
+                decoded["license_line"] = line
+                decoded.update(_license_fields(line))
+            if any(v.strip() == "NOMORE" for v in values):
+                decoded["nomore"] = True
         if frame_type in PORT_TYPES:
             candidates = []
             for zone in zones_between(tail, runs):

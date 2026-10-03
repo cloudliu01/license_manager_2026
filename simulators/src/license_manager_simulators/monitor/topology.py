@@ -13,6 +13,8 @@ class Listener:
     port: int
     daemon: str | None
     inode: int
+    # lmgrd tree this listener belongs to (None when constructed ad hoc)
+    manager_pid: int | None = None
 
 
 def _children(pid: int) -> list[int]:
@@ -76,7 +78,38 @@ def discover(manager_pid: int) -> dict[int, Listener]:
                 inode = int(target[8:-1])
                 port = listeners.get(inode)
                 if port is not None and port not in result:
-                    result[port] = Listener(pid, port, name, inode)
+                    result[port] = Listener(pid, port, name, inode, manager_pid)
         except (FileNotFoundError, PermissionError):
             continue
     return result
+
+
+def _cmdline_is_lmgrd(raw: bytes) -> bool:
+    """True when a /proc cmdline's argv0 is an lmgrd binary (basename starts
+    with 'lmgrd', covering version-suffixed installs). Vendor daemons and
+    simulator trees (python argv0) never match."""
+    parts = raw.split(b"\0")
+    if not parts or not parts[0]:
+        return False
+    name = Path(parts[0].decode("utf-8", "replace")).name
+    return name.startswith("lmgrd")
+
+
+def discover_managers() -> list[int]:
+    """All lmgrd tree roots on this host, found by scanning /proc cmdlines.
+
+    Only argv0 basenames starting with 'lmgrd' qualify; the monitor itself,
+    vendor daemons and python-based simulators are never matched. Sorted for
+    deterministic startup logs.
+    """
+    managers: list[int] = []
+    for entry in Path("/proc").iterdir():
+        if not entry.name.isdigit():
+            continue
+        try:
+            raw = (entry / "cmdline").read_bytes()
+        except OSError:
+            continue  # vanished between listing and reading
+        if _cmdline_is_lmgrd(raw):
+            managers.append(int(entry.name))
+    return sorted(managers)
